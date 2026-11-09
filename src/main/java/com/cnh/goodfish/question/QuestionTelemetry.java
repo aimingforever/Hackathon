@@ -48,11 +48,16 @@ final class QuestionTelemetry {
         similarity = meter.histogramBuilder("askonce.match.similarity")
                 .setDescription("Similarity of a submitted question to its best existing match")
                 .build();
+        // Only boards with waiters are reported, so made-up board names cannot grow metric cardinality.
         meter.gaugeBuilder("askonce.board_lock.queue_length")
-                .setDescription("Submissions currently waiting for a board lock")
+                .setDescription("Submissions currently waiting for a board lock (boards with waiters only)")
                 .ofLongs()
-                .buildWithCallback(m -> boardLocks.forEach(
-                        (board, lock) -> m.record(lock.getQueueLength(), Attributes.of(BOARD, board))));
+                .buildWithCallback(m -> boardLocks.forEach((board, lock) -> {
+                    int queued = lock.getQueueLength();
+                    if (queued > 0) {
+                        m.record(queued, Attributes.of(BOARD, board));
+                    }
+                }));
     }
 
     /** Runs {@code action} in a child span of the current span. */
