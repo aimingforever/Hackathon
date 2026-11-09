@@ -41,5 +41,6 @@ const AskOnce = (() => {
     submit: (board, text) => request('POST', `/api/boards/${board}/questions`, { text }),
     top: (board, limit = 50) => request('GET', `/api/boards/${board}/questions?limit=${limit}`),
     upvote: (id) => request('POST', `/api/questions/${id}/upvote`),
+    clear: (board) => request('DELETE', `/api/boards/${board}/questions`),
   };
 })();

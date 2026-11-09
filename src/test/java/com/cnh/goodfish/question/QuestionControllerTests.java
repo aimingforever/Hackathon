@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -93,6 +94,15 @@ class QuestionControllerTests {
         given(boards.get("nope")).willReturn(java.util.Optional.empty());
 
         mvc.perform(get("/api/boards/nope")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void clearDeletesBoardQuestions() throws Exception {
+        given(service.clear("keynote")).willReturn(9L);
+
+        mvc.perform(delete("/api/boards/keynote/questions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(9));
     }
 
     @Test

@@ -25,6 +25,13 @@
     <p id="error" class="feedback hidden"></p>
   </form>
 
+  <div class="card">
+    <p><strong>Just looking?</strong> Load a sample eBPF talk with 16 questions. Some mean the same thing and get merged;
+      others share the word "eBPF" but stay separate.</p>
+    <button id="sample" type="button" class="ghost">Load sample board</button>
+    <p id="sample-progress" class="hint hidden"></p>
+  </div>
+
   <div id="links" class="card hidden">
     <p><strong>Board ready.</strong></p>
     <p>Attendees ask here: <a id="ask-link"></a></p>
@@ -32,7 +39,41 @@
   </div>
 </main>
 <script src="/js/askonce.js"></script>
+<script src="/js/sample-questions.js"></script>
 <script>
+  function showLinks(board) {
+    for (const [id, page] of [['ask-link', 'ask'], ['board-link', 'board']]) {
+      const link = document.getElementById(id);
+      link.href = `/${page}.html?board=${board}`;
+      link.textContent = `${location.origin}/${page}.html?board=${board}`;
+    }
+    document.getElementById('links').classList.remove('hidden');
+  }
+
+  document.getElementById('sample').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const progress = document.getElementById('sample-progress');
+    const { board, topic, questions } = AskOnceSample;
+    button.disabled = true;
+    progress.classList.remove('hidden');
+    try {
+      progress.textContent = 'Resetting the sample board…';
+      await AskOnce.clear(board);
+      await AskOnce.setTopic(board, topic);
+      let merged = 0;
+      for (const [i, question] of questions.entries()) {
+        const result = await AskOnce.submit(board, question);
+        if (result.merged) merged++;
+        progress.textContent = `Asked ${i + 1} / ${questions.length} · ${merged} merged as duplicates`;
+      }
+      showLinks(board);
+    } catch {
+      progress.textContent = 'Could not load the sample board. Is the app connected to Elasticsearch?';
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   const form = document.getElementById('create');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -42,12 +83,7 @@
     error.classList.add('hidden');
     try {
       await AskOnce.setTopic(board, topic);
-      for (const [id, page] of [['ask-link', 'ask'], ['board-link', 'board']]) {
-        const link = document.getElementById(id);
-        link.href = `/${page}.html?board=${board}`;
-        link.textContent = `${location.origin}/${page}.html?board=${board}`;
-      }
-      document.getElementById('links').classList.remove('hidden');
+      showLinks(board);
     } catch (e) {
       error.textContent = 'Could not create the board. Check the name and try again.';
       error.classList.remove('hidden');

@@ -5,6 +5,12 @@ spring:
     uris: ${ES_URI:http://localhost:9200}
     username: elastic
     password: ${ES_LOCAL_PASSWORD}
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          # Always revalidate static pages so browsers never run a stale askonce.js after a deploy.
+          no-cache: true
 
 goodfish:
   questions:

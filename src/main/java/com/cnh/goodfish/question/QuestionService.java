@@ -112,6 +112,20 @@ public class QuestionService {
         return new SubmitResult(QuestionView.of(group), false, best == null ? null : best.similarity());
     }
 
+    /** Deletes every question group on a board, e.g. to reset a demo board. Returns how many were deleted. */
+    public long clear(String board) {
+        return withBoardLock(board, () -> {
+            try {
+                return client.deleteByQuery(d -> d
+                        .index(properties.index())
+                        .query(q -> q.term(t -> t.field("board").value(board)))
+                        .refresh(true)).deleted();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
     public QuestionView upvote(String id) {
         return QuestionView.of(update(id, UPVOTE_SCRIPT, Map.of()));
     }
