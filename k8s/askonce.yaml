@@ -1,0 +1,80 @@
+# AskOnce on Kubernetes (tested on kind with Elasticsearch running on the host via start-local).
+#
+# The Elasticsearch password is NOT stored here. Create the Secret first:
+#   set -a; source ~/elastic-start-local/.env; set +a
+#   kubectl -n askonce create secret generic es-credentials --from-literal=password="$ES_LOCAL_PASSWORD"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: askonce
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: askonce
+  namespace: askonce
+  labels:
+    app: askonce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: askonce
+  template:
+    metadata:
+      labels:
+        app: askonce
+    spec:
+      containers:
+        - name: askonce
+          image: askonce:0.1.0
+          imagePullPolicy: IfNotPresent # image is loaded into kind with `kind load docker-image`
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ES_URI
+              value: http://host.docker.internal:9200
+            - name: ES_LOCAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: es-credentials
+                  key: password
+          resources:
+            requests:
+              cpu: 250m
+              memory: 384Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 3
+            failureThreshold: 40
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: askonce
+  namespace: askonce
+  labels:
+    app: askonce
+spec:
+  selector:
+    app: askonce
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

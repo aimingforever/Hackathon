@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -69,6 +70,11 @@ class QuestionController {
             @PathVariable @Pattern(regexp = BOARD_PATTERN) String board,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
         return questions.top(board, limit);
+    }
+
+    @DeleteMapping("/boards/{board}/questions")
+    java.util.Map<String, Long> clear(@PathVariable @Pattern(regexp = BOARD_PATTERN) String board) {
+        return java.util.Map.of("deleted", questions.clear(board));
     }
 
     @PostMapping("/questions/{id}/upvote")

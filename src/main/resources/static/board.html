@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Speaker board · AskOnce</title>
+  <link rel="stylesheet" href="/css/askonce.css">
+</head>
+<body>
+<main class="wide board">
+  <div class="board-header">
+    <div>
+      <h1 class="brand">AskOnce</h1>
+      <p id="topic" class="topic"></p>
+      <p id="stats" class="stats"></p>
+    </div>
+    <div class="join">
+      <div id="qr"></div>
+      <div class="hint">Scan to ask</div>
+      <div id="ask-url" class="url hint"></div>
+    </div>
+  </div>
+  <div id="list"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/js/askonce.js"></script>
+<script>
+  const board = AskOnce.boardFromUrl();
+  const { el } = AskOnce;
+  const list = document.getElementById('list');
+  const lastAsks = new Map();
+
+  function render(groups) {
+    const people = groups.reduce((sum, g) => sum + g.asks, 0);
+    const saved = people - groups.length;
+    document.getElementById('stats').textContent =
+        `${people} questions asked · ${groups.length} unique · ${saved} duplicates merged`;
+
+    list.replaceChildren(...groups.map((g) => {
+      const others = g.variants.filter((v) => v !== g.text);
+      const card = el('div', { class: 'card question' },
+          el('div', { class: 'count' }, String(g.popularity), el('small', {}, g.popularity === 1 ? 'vote' : 'votes')),
+          el('div', { class: 'body' },
+              el('div', { class: 'text' }, g.text),
+              others.length
+                  ? el('ul', { class: 'variants' }, ...others.slice(0, 3).map((v) => el('li', {}, `also asked as: ${v}`)))
+                  : null));
+      const previous = lastAsks.get(g.id);
+      if (previous !== undefined && previous !== g.popularity) card.classList.add('pulse');
+      lastAsks.set(g.id, g.popularity);
+      return card;
+    }));
+  }
+
+  async function refresh() {
+    try { render(await AskOnce.top(board)); } catch { /* keep the last list on network errors */ }
+  }
+
+  if (!board) {
+    document.getElementById('topic').textContent = 'Board not found. Open this page with ?board=<name>.';
+  } else {
+    const askUrl = `${location.origin}/ask.html?board=${board}`;
+    document.getElementById('ask-url').textContent = askUrl;
+    if (window.QRCode) {
+      new QRCode(document.getElementById('qr'), { text: askUrl, width: 160, height: 160 });
+    }
+    AskOnce.getBoard(board)
+        .then((b) => { document.getElementById('topic').textContent = b.topic; })
+        .catch(() => { document.getElementById('topic').textContent = board; });
+    refresh();
+    setInterval(refresh, 2000);
+  }
+</script>
+</body>
+</html>
