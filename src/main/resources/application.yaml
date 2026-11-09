@@ -5,3 +5,17 @@ spring:
     uris: ${ES_URI:http://localhost:9200}
     username: elastic
     password: ${ES_LOCAL_PASSWORD}
+
+goodfish:
+  questions:
+    index: questions
+    board-index: boards
+    # Any sparse embedding endpoint works here; ELSER runs locally inside Elasticsearch.
+    inference-id: .elser-2-elasticsearch
+    # Semantic search hits checked before deciding whether to merge.
+    candidates: 5
+    # Topic-weighted cosine similarity needed to merge. Higher = fewer, safer merges.
+    merge-threshold: 0.3
+    # Weight of the board topic's own words (1.0 = no down-weighting).
+    topic-floor: 0.1
+    create-index: true
