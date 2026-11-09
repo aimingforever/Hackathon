@@ -7,6 +7,9 @@
 #   kubectl -n askonce create secret generic dash0-otlp \
 #     --from-literal=endpoint=<Dash0 "OTLP via HTTP" endpoint> \
 #     --from-literal=headers="Authorization=Bearer $DASH0_TOKEN"
+#   # Optional, for real-user monitoring: an ingest-only Dash0 token (it is visible to browsers)
+#   read -rs DASH0_RUM_TOKEN
+#   kubectl -n askonce create secret generic dash0-rum --from-literal=token="$DASH0_RUM_TOKEN"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -41,7 +44,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: askonce
-          image: askonce:0.3.0
+          image: askonce:0.4.0
           imagePullPolicy: IfNotPresent # image is loaded into kind with `kind load docker-image`
           ports:
             - name: http
@@ -71,6 +74,18 @@ spec:
                   key: headers
             - name: OTEL_METRIC_EXPORT_INTERVAL
               value: "10000"
+            # Browser real-user monitoring (optional: pages run without it when the Secret is missing)
+            - name: GOODFISH_RUM_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: dash0-otlp
+                  key: endpoint
+            - name: GOODFISH_RUM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dash0-rum
+                  key: token
+                  optional: true
             # Name the Elasticsearch dependency so traces and the service map show "elasticsearch"
             # (with its share of request time) instead of a bare host name.
             - name: OTEL_INSTRUMENTATION_COMMON_PEER_SERVICE_MAPPING
