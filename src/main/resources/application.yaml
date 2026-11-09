@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: goodfish
+  elasticsearch:
+    uris: ${ES_URI:http://localhost:9200}
+    username: elastic
+    password: ${ES_LOCAL_PASSWORD}
