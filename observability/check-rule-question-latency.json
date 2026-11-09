@@ -1,0 +1,21 @@
+{
+  "id": "askonce-question-latency",
+  "name": "AskOnce: question submissions are slow",
+  "expression": "histogram_quantile(0.95, sum(rate({otel_metric_name=\"http.server.request.duration\", service_name=\"askonce\", http_route=\"/api/boards/{board}/questions\", http_request_method=\"POST\"}[5m]))) > $__threshold",
+  "thresholds": {
+    "degraded": 1,
+    "failed": 5
+  },
+  "interval": "1m",
+  "for": "2m",
+  "keep_firing_for": "2m",
+  "labels": {
+    "service": "askonce",
+    "team": "askonce"
+  },
+  "annotations": {
+    "summary": "p95 latency of POST /api/boards/{board}/questions is {{ $value | humanizeDuration }}",
+    "description": "Attendees wait too long after asking. Last time this happened the board lock was held during an index refresh (refresh=wait_for). Check the askonce.board_lock.wait spans and the 'Slow submission' logs."
+  },
+  "enabled": true
+}
