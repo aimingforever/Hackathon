@@ -66,7 +66,6 @@ class QuestionIndexInitializer implements ApplicationRunner {
               }
             }
             """;
-
     /** Turns {"mappings": {...}} into the {...} body that the put-mapping API expects. */
     static String propertiesOnly(String mapping) {
         String body = mapping.strip();
