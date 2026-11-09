@@ -45,7 +45,7 @@ The embedding model is a config setting (`goodfish.questions.inference-id`), so 
 
 ## Run it locally
 
-Requirements: Java 25, Docker, `jq` (for the demo script).
+Requirements: Java 25, Docker, `jq` (used by the demo and setup scripts).
 
 1. Start Elasticsearch and Kibana locally with [start-local](https://github.com/elastic/start-local):
    ```bash
@@ -63,19 +63,64 @@ Requirements: Java 25, Docker, `jq` (for the demo script).
 
 ## Run it on Kubernetes (kind)
 
-AskOnce runs in a local [kind](https://kind.sigs.k8s.io/) cluster connected to [Radar Cloud](https://radarhq.io), and reaches Elasticsearch on the host through `host.docker.internal`.
+AskOnce runs in a local [kind](https://kind.sigs.k8s.io/) cluster connected to [Radar Cloud](https://radarhq.io), and reaches Elasticsearch on the host through `host.docker.internal`. Requirements: `kind`, `kubectl`, a kind cluster named `cnh` (`kind create cluster --name cnh`), and Elasticsearch running locally as above.
+
+1. Build the image with the tag the manifest expects, and load it into kind:
+   ```bash
+   ./mvnw -DskipTests package
+   TAG=$(grep -oE 'image: askonce:[0-9.]+' k8s/askonce.yaml | cut -d: -f3)
+   docker build -t askonce:$TAG .
+   kind load docker-image askonce:$TAG --name cnh
+   ```
+2. Create the namespace and the Secrets. Credentials never go into the repository.
+   ```bash
+   kubectl create namespace askonce
+   set -a; source ~/elastic-start-local/.env; set +a
+   kubectl -n askonce create secret generic es-credentials --from-literal=password="$ES_LOCAL_PASSWORD"
+   ```
+   Dash0 (required): the OTLP endpoint from *Organization Settings → Endpoints → OTLP via HTTP* and an auth token. `read -rs` keeps the token off the screen and out of shell history.
+   ```bash
+   read -rs DASH0_TOKEN
+   kubectl -n askonce create secret generic dash0-otlp \
+     --from-literal=endpoint=https://ingress.us-west-2.aws.dash0.com \
+     --from-literal=headers="Authorization=Bearer $DASH0_TOKEN"
+   ```
+   Dash0 real-user monitoring (optional): an **ingest-only** token, because browsers can see it. Without it the pages run without RUM.
+   ```bash
+   read -rs DASH0_RUM_TOKEN
+   kubectl -n askonce create secret generic dash0-rum --from-literal=token="$DASH0_RUM_TOKEN"
+   ```
+3. Deploy and open the app at http://localhost:8080:
+   ```bash
+   kubectl apply -f k8s/askonce.yaml
+   kubectl -n askonce rollout status deploy/askonce
+   kubectl -n askonce port-forward svc/askonce 8080:80
+   ```
+
+## Set up the Elastic and Dash0 extras (optional)
+
+These scripts recreate everything we configured outside the app. Each one is safe to run again.
 
 ```bash
-./mvnw -DskipTests package
-docker build -t askonce:0.1.0 .
-kind load docker-image askonce:0.1.0 --name cnh
-kubectl apply -f k8s/askonce.yaml
 set -a; source ~/elastic-start-local/.env; set +a
-kubectl -n askonce create secret generic es-credentials --from-literal=password="$ES_LOCAL_PASSWORD"
-kubectl -n askonce port-forward svc/askonce 8080:80
+elastic/setup-agent-builder.sh   # Agent Builder: 3 ES|QL tools + the speaker-assistant agent
+elastic/setup-workflows.sh       # Workflow: board snapshots every 5 minutes
+elastic/setup-dashboard.sh       # Kibana dashboard "AskOnce: live Q&A"
 ```
 
-Tests: `./mvnw test` runs the unit tests without Elasticsearch. With `ES_LOCAL_PASSWORD` set, `QuestionServiceElasticsearchIT` also runs against the local Elasticsearch.
+The Dash0 SLO, check rule and dashboard are in `observability/`. They were created with the Dash0 API, for example:
+
+```bash
+curl -X POST "https://api.us-west-2.aws.dash0.com/api/slos?dataset=default" \
+  -H "Authorization: Bearer $DASH0_TOKEN" -H 'Content-Type: application/json' \
+  --data @observability/slo-question-latency.json
+```
+
+(`/api/alerting/check-rules` for `check-rule-question-latency.json`, `/api/dashboards` for `dash0-dashboard.json`.)
+
+## Tests
+
+`./mvnw test` runs the unit tests without Elasticsearch. With `ES_LOCAL_PASSWORD` set, `QuestionServiceElasticsearchIT` also runs against the local Elasticsearch.
 
 ## AI assistance
 
