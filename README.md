@@ -19,7 +19,7 @@ attendee ──POST question──▶ AskOnce (Spring Boot)
 ```
 
 1. **Elasticsearch finds candidates** with an ELSER `semantic` query on a `semantic_text` field.
-2. **A topic-aware similarity decides**: cosine similarity over ELSER token vectors, with the board topic's own words (for example "eBPF" for an eBPF talk) down-weighted. Without this, every question mentioning the talk topic looked like a duplicate.
+2. **A topic-aware similarity decides**: cosine similarity over ELSER token vectors, with the board topic's own words (for example "Kubernetes" for a Kubernetes talk) down-weighted. Without this, every question mentioning the talk topic looked like a duplicate.
 
 The embedding model is a config setting (`goodfish.questions.inference-id`), so a multilingual model can be swapped in to merge questions asked in different languages.
 
@@ -34,7 +34,7 @@ The embedding model is a config setting (`goodfish.questions.inference-id`), so 
 
 | Endpoint | Purpose |
 |---|---|
-| `PUT /api/boards/{board}` | Set the board topic, e.g. `{"topic": "eBPF in production"}` |
+| `PUT /api/boards/{board}` | Set the board topic, e.g. `{"topic": "Kubernetes in production"}` |
 | `POST /api/boards/{board}/questions` | Submit `{"text": "..."}`; returns the group and whether it was merged |
 | `GET /api/boards/{board}/questions` | Groups ranked by asks + votes |
 | `POST /api/questions/{id}/upvote` | Upvote a group |
@@ -54,7 +54,7 @@ Requirements: Java 25, Docker, `jq` (for the demo script).
    ```
 3. Submit the demo questions and see them merged:
    ```bash
-   demo/submit-questions.sh demo-ebpf-talk
+   demo/submit-questions.sh demo-k8s-talk
    ```
 
 ## Run it on Kubernetes (kind)

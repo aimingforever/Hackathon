@@ -44,7 +44,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: askonce
-          image: askonce:0.4.0
+          image: askonce:0.4.1
           imagePullPolicy: IfNotPresent # image is loaded into kind with `kind load docker-image`
           ports:
             - name: http
