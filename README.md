@@ -28,7 +28,7 @@ The embedding model is a config setting (`goodfish.questions.inference-id`), so 
 | Elasticsearch | Core data store; ELSER semantic search for duplicate detection |
 | Gitar | Every feature lands through a reviewed PR; project rules in `.gitar/review/` |
 | Dash0 | OpenTelemetry traces, logs and metrics (in progress) |
-| Radar | Runs on a kind Kubernetes cluster connected to Radar Cloud (in progress) |
+| Radar | Runs on a kind Kubernetes cluster connected to Radar Cloud; used to deploy, watch and troubleshoot |
 
 ## API
 
@@ -56,6 +56,20 @@ Requirements: Java 25, Docker, `jq` (for the demo script).
    ```bash
    demo/submit-questions.sh ebpf-talk
    ```
+
+## Run it on Kubernetes (kind)
+
+AskOnce runs in a local [kind](https://kind.sigs.k8s.io/) cluster connected to [Radar Cloud](https://radarhq.io), and reaches Elasticsearch on the host through `host.docker.internal`.
+
+```bash
+./mvnw -DskipTests package
+docker build -t askonce:0.1.0 .
+kind load docker-image askonce:0.1.0 --name cnh
+kubectl apply -f k8s/askonce.yaml
+set -a; source ~/elastic-start-local/.env; set +a
+kubectl -n askonce create secret generic es-credentials --from-literal=password="$ES_LOCAL_PASSWORD"
+kubectl -n askonce port-forward svc/askonce 8080:80
+```
 
 Tests: `./mvnw test` runs the unit tests without Elasticsearch. With `ES_LOCAL_PASSWORD` set, `QuestionServiceElasticsearchIT` also runs against the local Elasticsearch.
 

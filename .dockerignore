@@ -1,0 +1,5 @@
+target/*
+!target/goodfish-0.0.1-SNAPSHOT.jar
+.git
+.idea
+.env*
