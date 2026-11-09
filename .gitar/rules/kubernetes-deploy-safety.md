@@ -18,7 +18,7 @@ Radar's AI investigation flagged hardening gaps in `deployment/askonce`, which w
 1. Add the label `deploy`.
 2. In `k8s/askonce.yaml`, confirm these are still present: `runAsNonRoot: true`, `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `capabilities.drop: ["ALL"]`, `automountServiceAccountToken: false`, and the startup, liveness and readiness probes.
 3. Confirm credentials only come from Secrets (`secretKeyRef`), never from literal `value:` entries.
-4. If `src/main` changed, confirm the `image: askonce:x.y.z` tag was bumped compared with the base branch.
+4. If `src/main` changed, confirm the `image: askonce:x.y.z` tag was bumped compared with the base branch, and that `service.version` in `OTEL_RESOURCE_ATTRIBUTES` matches that tag (Dash0 uses it to tell deploys apart).
 5. Post one comment listing anything that is missing, with the exact YAML to add. Post nothing if all checks pass.
 
 ## Why This Matters
