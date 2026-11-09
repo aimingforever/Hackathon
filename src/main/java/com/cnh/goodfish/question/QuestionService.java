@@ -15,6 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 
 /**
@@ -55,6 +57,7 @@ public class QuestionService {
     private final Embedder embedder;
     private final BoardService boards;
     private final Clock clock;
+    private final Map<String, Object> boardLocks = new ConcurrentHashMap<>();
 
     public QuestionService(ElasticsearchClient client, QuestionProperties properties, Embedder embedder,
                            BoardService boards, Clock clock) {
@@ -73,7 +76,21 @@ public class QuestionService {
     record Match(String id, double similarity) {
     }
 
+    /**
+     * Submits a question. Submissions are serialized per board so that concurrent identical questions
+     * cannot each miss the other and create duplicate groups.
+     */
     public SubmitResult submit(String board, String text) {
+        return withBoardLock(board, () -> doSubmit(board, text));
+    }
+
+    <T> T withBoardLock(String board, Supplier<T> action) {
+        synchronized (boardLocks.computeIfAbsent(board, key -> new Object())) {
+            return action.get();
+        }
+    }
+
+    private SubmitResult doSubmit(String board, String text) {
         String question = text.strip();
         Map<String, Float> tokens = embedder.embed(question);
         Match best = bestMatch(candidates(board, question), tokens, boards.topicWeights(board));
@@ -141,7 +158,10 @@ public class QuestionService {
                             .source(src -> src.filter(f -> f.includes(QuestionGroup.SOURCE_FIELDS)))
                             .query(q -> q.bool(b -> b
                                     .filter(f -> f.term(t -> t.field("board").value(board)))
-                                    .must(m -> m.semantic(sem -> sem.field("text").query(question))))),
+                                    .must(m -> m.bool(inner -> inner
+                                            .should(sh -> sh.semantic(sem -> sem.field("text").query(question)))
+                                            .should(sh -> sh.semantic(sem -> sem.field("variants").query(question)))
+                                            .minimumShouldMatch("1"))))),
                     QuestionGroup.class);
             return response.hits().hits().stream().map(Hit::source).toList();
         } catch (IOException e) {

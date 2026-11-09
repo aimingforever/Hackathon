@@ -3,8 +3,15 @@ package com.cnh.goodfish.question;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class QuestionServiceTests {
@@ -51,6 +58,61 @@ class QuestionServiceTests {
         assertThat(best.id()).isEqualTo("g1");
         assertThat(best.similarity()).isCloseTo(1.0, within(1e-6));
         assertThat(QuestionService.bestMatch(List.of(), EBPF_OVERHEAD, Map.of())).isNull();
+    }
+
+    @Test
+    void submissionsOnTheSameBoardAreSerializedButDifferentBoardsAreNot() throws Exception {
+        QuestionService service = new QuestionService(null, null, null, null, Clock.systemUTC());
+        ExecutorService pool = Executors.newFixedThreadPool(4);
+        try {
+            // Same board: never more than one action inside the lock at a time.
+            AtomicInteger inside = new AtomicInteger();
+            AtomicInteger maxInside = new AtomicInteger();
+            List<Future<Integer>> sameBoard = new java.util.ArrayList<>();
+            for (int i = 0; i < 4; i++) {
+                sameBoard.add(pool.submit(() -> service.withBoardLock("talk", () -> {
+                    maxInside.accumulateAndGet(inside.incrementAndGet(), Math::max);
+                    sleep(50);
+                    return inside.decrementAndGet();
+                })));
+            }
+            for (Future<Integer> f : sameBoard) {
+                f.get(5, TimeUnit.SECONDS);
+            }
+            assertThat(maxInside.get()).isEqualTo(1);
+
+            // Different boards: a held lock on one board must not block another board.
+            CountDownLatch holding = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            Future<?> holder = pool.submit(() -> service.withBoardLock("a", () -> {
+                holding.countDown();
+                await(release);
+                return null;
+            }));
+            assertThat(holding.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<String> other = pool.submit(() -> service.withBoardLock("b", () -> "done"));
+            assertThat(other.get(5, TimeUnit.SECONDS)).isEqualTo("done");
+            release.countDown();
+            holder.get(5, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Test

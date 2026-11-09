@@ -48,7 +48,7 @@ class QuestionIndexInitializer implements ApplicationRunner {
                       "id":            { "type": "keyword" },
                       "board":         { "type": "keyword" },
                       "text":          { "type": "semantic_text", "inference_id": "%s" },
-                      "variants":      { "type": "text", "index": false },
+                      "variants":      { "type": "semantic_text", "inference_id": "%s" },
                       "variantTokens": { "type": "object", "enabled": false },
                       "asks":          { "type": "integer" },
                       "votes":         { "type": "integer" },
@@ -58,7 +58,7 @@ class QuestionIndexInitializer implements ApplicationRunner {
                     }
                   }
                 }
-                """.formatted(properties.inferenceId());
+                """.formatted(properties.inferenceId(), properties.inferenceId());
     }
 
     static final String BOARD_MAPPING = """
