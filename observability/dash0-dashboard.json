@@ -1,0 +1,218 @@
+{
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "askonce"
+  },
+  "spec": {
+    "display": {
+      "name": "AskOnce: health"
+    },
+    "duration": "3h",
+    "refreshInterval": "30s",
+    "panels": {
+      "latency": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Question submit latency (p50 / p95)"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "seconds"
+                }
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "histogram_quantile(0.5, sum(rate({otel_metric_name=\"http.server.request.duration\", service_name=\"askonce\", http_route=\"/api/boards/{board}/questions\", http_request_method=\"POST\"}[5m])))",
+                    "seriesNameFormat": "p50"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "histogram_quantile(0.95, sum(rate({otel_metric_name=\"http.server.request.duration\", service_name=\"askonce\", http_route=\"/api/boards/{board}/questions\", http_request_method=\"POST\"}[5m])))",
+                    "seriesNameFormat": "p95"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "lockwait": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Board lock wait (p95)"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "milliseconds"
+                }
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "histogram_quantile(0.95, sum(rate({otel_metric_name=\"askonce.board_lock.wait\", service_name=\"askonce\"}[5m])))",
+                    "seriesNameFormat": "p95 wait"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "results": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Questions submitted: merged vs new"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "sum by (askonce_result) (increase({otel_metric_name=\"askonce.questions.submitted\", service_name=\"askonce\"}[5m]))",
+                    "seriesNameFormat": "{{askonce_result}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "es": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Elasticsearch call latency (p95)"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "seconds"
+                }
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "histogram_quantile(0.95, sum(rate({otel_metric_name=\"http.client.request.duration\", service_name=\"askonce\"}[5m])))",
+                    "seriesNameFormat": "elasticsearch"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "layouts": [
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "AskOnce",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/latency"
+              }
+            },
+            {
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/lockwait"
+              }
+            },
+            {
+              "x": 0,
+              "y": 8,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/results"
+              }
+            },
+            {
+              "x": 12,
+              "y": 8,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/es"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

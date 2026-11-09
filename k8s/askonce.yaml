@@ -1,0 +1,156 @@
+# AskOnce on Kubernetes (tested on kind with Elasticsearch running on the host via start-local).
+#
+# Credentials are NOT stored here. Create the Secrets first:
+#   set -a; source ~/elastic-start-local/.env; set +a
+#   kubectl -n askonce create secret generic es-credentials --from-literal=password="$ES_LOCAL_PASSWORD"
+#   read -rs DASH0_TOKEN   # paste the Dash0 auth token, then press Enter
+#   kubectl -n askonce create secret generic dash0-otlp \
+#     --from-literal=endpoint=<Dash0 "OTLP via HTTP" endpoint> \
+#     --from-literal=headers="Authorization=Bearer $DASH0_TOKEN"
+#   # Optional, for real-user monitoring: an ingest-only Dash0 token (it is visible to browsers)
+#   read -rs DASH0_RUM_TOKEN
+#   kubectl -n askonce create secret generic dash0-rum --from-literal=token="$DASH0_RUM_TOKEN"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: askonce
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: askonce
+  namespace: askonce
+  labels:
+    app: askonce
+spec:
+  # One replica on purpose: duplicate detection serializes submissions per board with an in-process
+  # lock, so two pods could each create the same group. Scaling out needs a shared lock first.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: askonce
+  template:
+    metadata:
+      labels:
+        app: askonce
+    spec:
+      # Hardening from Radar's audit: the app never calls the Kubernetes API.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: askonce
+          image: askonce:0.5.0
+          imagePullPolicy: IfNotPresent # image is loaded into kind with `kind load docker-image`
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ES_URI
+              value: http://host.docker.internal:9200
+            - name: ES_LOCAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: es-credentials
+                  key: password
+            # OpenTelemetry -> Dash0
+            - name: OTEL_SERVICE_NAME
+              value: askonce
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: http/protobuf
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: dash0-otlp
+                  key: endpoint
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: dash0-otlp
+                  key: headers
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: "10000"
+            # Browser real-user monitoring (optional: pages run without it when the Secret is missing)
+            - name: GOODFISH_RUM_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: dash0-otlp
+                  key: endpoint
+            - name: GOODFISH_RUM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dash0-rum
+                  key: token
+                  optional: true
+            # Name the Elasticsearch dependency so traces and the service map show "elasticsearch"
+            # (with its share of request time) instead of a bare host name.
+            - name: OTEL_INSTRUMENTATION_COMMON_PEER_SERVICE_MAPPING
+              value: host.docker.internal=elasticsearch,host.docker.internal:9200=elasticsearch
+            - name: K8S_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.namespace=askonce,deployment.environment.name=hackathon,k8s.cluster.name=cnh,k8s.namespace.name=askonce,k8s.deployment.name=askonce,k8s.pod.name=$(K8S_POD_NAME),k8s.node.name=$(K8S_NODE_NAME)
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # Writable scratch space for Tomcat and the JVM; the root filesystem is read-only.
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 250m
+              memory: 384Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            # The JVM plus the OpenTelemetry agent needs ~8 s to start; probing earlier only logs
+            # "Unhealthy: connection refused" events (flagged by Radar).
+            initialDelaySeconds: 8
+            periodSeconds: 3
+            failureThreshold: 40
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: askonce
+  namespace: askonce
+  labels:
+    app: askonce
+spec:
+  selector:
+    app: askonce
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

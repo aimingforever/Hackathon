@@ -1,0 +1,38 @@
+name: AskOnce board snapshot
+description: >-
+  Every 5 minutes, compute each board's Q&A stats with ES|QL (questions asked, unique
+  questions after merging duplicates, duplicates merged, votes) and store a snapshot in the
+  askonce-board-snapshots index, so Kibana can chart how Q&A evolves during a talk.
+enabled: true
+tags: [askonce]
+triggers:
+  - type: scheduled
+    with:
+      every: 5m
+  - type: manual
+steps:
+  - name: board_stats
+    type: elasticsearch.esql.query
+    with:
+      format: json
+      query: >-
+        FROM questions
+        | STATS questions = SUM(asks), unique_questions = COUNT(*), votes = SUM(votes) BY board
+        | EVAL duplicates_merged = questions - unique_questions
+        | KEEP board, questions, unique_questions, duplicates_merged, votes
+  - name: save_snapshots
+    type: foreach
+    foreach: "{{ steps.board_stats.output.values | json }}"
+    steps:
+      - name: index_snapshot
+        type: elasticsearch.index
+        with:
+          index: askonce-board-snapshots
+          id: "{{ execution.id }}-{{ foreach.index }}"
+          document:
+            "@timestamp": "{{ execution.startedAt | date: '%Y-%m-%dT%H:%M:%SZ' }}"
+            board: "{{ foreach.item[0] }}"
+            questions: "{{ foreach.item[1] }}"
+            unique_questions: "{{ foreach.item[2] }}"
+            duplicates_merged: "{{ foreach.item[3] }}"
+            votes: "{{ foreach.item[4] }}"

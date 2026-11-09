@@ -1,0 +1,191 @@
+{
+  "title": "AskOnce: live Q&A",
+  "description": "Questions, duplicates merged and how Q&A evolves on the demo board. Data from the questions index (ES|QL) and the askonce-board-snapshots index written by the AskOnce Elastic Workflow.",
+  "panels": [
+    {
+      "type": "vis",
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 7
+      },
+      "config": {
+        "title": "Questions asked",
+        "type": "metric",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM questions | WHERE board == \"demo-k8s-talk\" | STATS questions = SUM(asks)"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "questions"
+          }
+        ]
+      }
+    },
+    {
+      "type": "vis",
+      "grid": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 7
+      },
+      "config": {
+        "title": "Unique questions",
+        "type": "metric",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM questions | WHERE board == \"demo-k8s-talk\" | STATS unique_questions = COUNT(*)"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "unique_questions"
+          }
+        ]
+      }
+    },
+    {
+      "type": "vis",
+      "grid": {
+        "x": 24,
+        "y": 0,
+        "w": 12,
+        "h": 7
+      },
+      "config": {
+        "title": "Duplicates merged",
+        "type": "metric",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM questions | WHERE board == \"demo-k8s-talk\" | STATS merged = SUM(asks) - COUNT(*)"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "merged"
+          }
+        ]
+      }
+    },
+    {
+      "type": "vis",
+      "grid": {
+        "x": 36,
+        "y": 0,
+        "w": 12,
+        "h": 7
+      },
+      "config": {
+        "title": "Merge rate (%)",
+        "type": "metric",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM questions | WHERE board == \"demo-k8s-talk\" | STATS q = SUM(asks), u = COUNT(*) | EVAL merge_rate = ROUND(100.0 * (q - u) / q, 1) | KEEP merge_rate"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "merge_rate"
+          }
+        ]
+      }
+    },
+    {
+      "type": "vis",
+      "grid": {
+        "x": 0,
+        "y": 7,
+        "w": 28,
+        "h": 14
+      },
+      "config": {
+        "title": "Top questions (asks + votes)",
+        "type": "xy",
+        "layers": [
+          {
+            "type": "bar",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM questions | WHERE board == \"demo-k8s-talk\" | SORT popularity DESC | LIMIT 10 | KEEP text, popularity"
+            },
+            "x": {
+              "column": "text"
+            },
+            "y": [
+              {
+                "column": "popularity"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "vis",
+      "grid": {
+        "x": 28,
+        "y": 7,
+        "w": 20,
+        "h": 14
+      },
+      "config": {
+        "title": "Questions over time (Elastic Workflow snapshots)",
+        "type": "xy",
+        "layers": [
+          {
+            "type": "line",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM askonce-board-snapshots | WHERE board == \"demo-k8s-talk\" | STATS questions = MAX(questions), unique_questions = MAX(unique_questions) BY time = DATE_TRUNC(5 minutes, @timestamp) | SORT time"
+            },
+            "x": {
+              "column": "time"
+            },
+            "y": [
+              {
+                "column": "questions"
+              },
+              {
+                "column": "unique_questions"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "vis",
+      "grid": {
+        "x": 0,
+        "y": 21,
+        "w": 48,
+        "h": 10
+      },
+      "config": {
+        "title": "Questions asked per board",
+        "type": "xy",
+        "layers": [
+          {
+            "type": "bar",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM questions | STATS questions = SUM(asks) BY board | SORT questions DESC"
+            },
+            "x": {
+              "column": "board"
+            },
+            "y": [
+              {
+                "column": "questions"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

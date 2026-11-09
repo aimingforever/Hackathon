@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ask a question · AskOnce</title>
+  <link rel="stylesheet" href="/css/askonce.css">
+  <script src="/js/rum.js"></script>
+</head>
+<body>
+<main>
+  <h1 class="brand">AskOnce</h1>
+  <p id="topic" class="topic"></p>
+
+  <form id="ask" class="card">
+    <label for="question">Your question</label>
+    <textarea id="question" required minlength="3" maxlength="300"
+              placeholder="Ask anything. If someone already asked it, your vote is added to theirs."></textarea>
+    <div class="row space" style="margin-top: 10px">
+      <span id="chars" class="hint">0 / 300</span>
+      <button id="send" type="submit">Ask</button>
+    </div>
+    <div id="feedback" class="feedback hidden"></div>
+  </form>
+
+  <div class="row space">
+    <h2 style="margin: 12px 0">Questions so far</h2>
+    <span id="stats" class="hint"></span>
+  </div>
+  <div id="list"></div>
+</main>
+<script src="/js/askonce.js"></script>
+<script>
+  const board = AskOnce.boardFromUrl();
+  const { el } = AskOnce;
+  const list = document.getElementById('list');
+  const textarea = document.getElementById('question');
+  const feedback = document.getElementById('feedback');
+  const VOTED_KEY = `askonce:voted:${board}`;
+
+  function voted() {
+    try { return new Set(JSON.parse(localStorage.getItem(VOTED_KEY) || '[]')); } catch { return new Set(); }
+  }
+  function rememberVote(id) {
+    const ids = voted();
+    ids.add(id);
+    try { localStorage.setItem(VOTED_KEY, JSON.stringify([...ids])); } catch { /* storage unavailable */ }
+  }
+
+  function render(groups) {
+    const mine = voted();
+    const people = groups.reduce((sum, g) => sum + g.asks, 0);
+    document.getElementById('stats').textContent =
+        `${people} asked · ${groups.length} unique`;
+    list.replaceChildren(...groups.map((g) => {
+      const button = el('button', {
+        class: 'ghost',
+        onclick: async () => {
+          button.disabled = true;
+          await AskOnce.upvote(g.id);
+          rememberVote(g.id);
+          refresh();
+        },
+      }, '▲ Me too');
+      if (mine.has(g.id)) button.disabled = true;
+      return el('div', { class: 'card question' },
+          el('div', { class: 'count' }, String(g.popularity), el('small', {}, 'votes')),
+          el('div', { class: 'body' },
+              el('div', { class: 'text' }, g.text),
+              el('div', { class: 'hint' }, g.asks > 1 ? `Asked by ${g.asks} people` : 'Asked once')),
+          button);
+    }));
+  }
+
+  async function refresh() {
+    try { render(await AskOnce.top(board)); } catch { /* keep the last list on network errors */ }
+  }
+
+  textarea.addEventListener('input', () => {
+    document.getElementById('chars').textContent = `${textarea.value.length} / 300`;
+  });
+
+  document.getElementById('ask').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const send = document.getElementById('send');
+    send.disabled = true;
+    feedback.className = 'feedback';
+    feedback.textContent = 'Checking whether someone already asked this…';
+    try {
+      const result = await AskOnce.submit(board, textarea.value);
+      rememberVote(result.group.id);
+      if (result.merged) {
+        feedback.className = 'feedback merged';
+        feedback.textContent = `Someone already asked this. Your vote was added: ` +
+            `"${result.group.text}" (${result.group.asks} people).`;
+      } else {
+        feedback.textContent = 'Thanks! Your question is on the board.';
+      }
+      textarea.value = '';
+      textarea.dispatchEvent(new Event('input'));
+      refresh();
+    } catch {
+      feedback.textContent = 'Could not send your question. Please try again.';
+    } finally {
+      send.disabled = false;
+    }
+  });
+
+  if (!board) {
+    document.getElementById('topic').textContent = 'Board not found. Check the link you were given.';
+    document.getElementById('ask').classList.add('hidden');
+  } else {
+    AskOnce.getBoard(board)
+        .then((b) => { document.getElementById('topic').textContent = b.topic; })
+        .catch(() => { document.getElementById('topic').textContent = board; });
+    refresh();
+    setInterval(refresh, 3000);
+  }
+</script>
+</body>
+</html>

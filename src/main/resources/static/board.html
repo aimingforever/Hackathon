@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Speaker board · AskOnce</title>
+  <link rel="stylesheet" href="/css/askonce.css">
+  <script src="/js/rum.js"></script>
+</head>
+<body>
+<main class="wide board">
+  <div class="board-header">
+    <div>
+      <h1 class="brand">AskOnce</h1>
+      <p id="topic" class="topic"></p>
+      <p id="stats" class="stats"></p>
+    </div>
+    <div class="join">
+      <div id="qr"></div>
+      <div class="hint">Scan to ask</div>
+      <div id="ask-url" class="url hint"></div>
+    </div>
+  </div>
+  <form id="find" class="card row" style="margin-bottom: 16px">
+    <input id="find-q" type="search" placeholder="Find a question: try “Postgres” or “kubernets secrets”" autocomplete="off">
+    <button type="submit" class="ghost">Find</button>
+  </form>
+  <div id="results" class="hidden"></div>
+  <div id="list"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/js/askonce.js"></script>
+<script>
+  const board = AskOnce.boardFromUrl();
+  const { el } = AskOnce;
+  const list = document.getElementById('list');
+  const lastAsks = new Map();
+
+  async function renderStats() {
+    // Computed by Elasticsearch aggregations (GET /api/boards/{board}/stats).
+    const s = await AskOnce.stats(board);
+    document.getElementById('stats').textContent =
+        `${s.questions} questions asked · ${s.groups} unique · ${s.duplicatesMerged} duplicates merged` +
+        (s.questions ? ` (${Math.round(s.mergeRate * 100)}%)` : '');
+  }
+
+  // Hybrid search (keyword + semantic, fused with RRF) over this board.
+  document.getElementById('find').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const q = document.getElementById('find-q').value.trim();
+    const results = document.getElementById('results');
+    if (!q) { results.classList.add('hidden'); return; }
+    const hits = await AskOnce.search(board, q);
+    results.classList.remove('hidden');
+    results.replaceChildren(
+        el('p', { class: 'hint' }, hits.length ? `Best matches for “${q}” (hybrid keyword + semantic search):` : `No match for “${q}”.`),
+        ...hits.map((h) => el('div', { class: 'card question' },
+            el('div', { class: 'count' }, String(h.group.popularity), el('small', {}, 'votes')),
+            el('div', { class: 'body' }, el('div', { class: 'text' }, h.group.text)))));
+  });
+
+  function render(groups) {
+
+    list.replaceChildren(...groups.map((g) => {
+      const others = g.variants.filter((v) => v !== g.text);
+      const card = el('div', { class: 'card question' },
+          el('div', { class: 'count' }, String(g.popularity), el('small', {}, g.popularity === 1 ? 'vote' : 'votes')),
+          el('div', { class: 'body' },
+              el('div', { class: 'text' }, g.text),
+              others.length
+                  ? el('ul', { class: 'variants' }, ...others.slice(0, 3).map((v) => el('li', {}, `also asked as: ${v}`)))
+                  : null));
+      const previous = lastAsks.get(g.id);
+      if (previous !== undefined && previous !== g.popularity) card.classList.add('pulse');
+      lastAsks.set(g.id, g.popularity);
+      return card;
+    }));
+  }
+
+  async function refresh() {
+    try {
+      render(await AskOnce.top(board));
+      await renderStats();
+    } catch { /* keep the last list on network errors */ }
+  }
+
+  if (!board) {
+    document.getElementById('topic').textContent = 'Board not found. Open this page with ?board=<name>.';
+  } else {
+    const askUrl = `${location.origin}/ask.html?board=${board}`;
+    document.getElementById('ask-url').textContent = askUrl;
+    if (window.QRCode) {
+      new QRCode(document.getElementById('qr'), { text: askUrl, width: 160, height: 160 });
+    }
+    AskOnce.getBoard(board)
+        .then((b) => { document.getElementById('topic').textContent = b.topic; })
+        .catch(() => { document.getElementById('topic').textContent = board; });
+    refresh();
+    setInterval(refresh, 2000);
+  }
+</script>
+</body>
+</html>
