@@ -1,0 +1,54 @@
+{
+  "apiVersion": "openslo/v1",
+  "kind": "SLO",
+  "metadata": {
+    "name": "askonce-question-latency",
+    "displayName": "AskOnce: questions answered within 1s",
+    "annotations": {
+      "dash0.com/display-name": "AskOnce: questions answered within 1s"
+    }
+  },
+  "spec": {
+    "description": "95% of question submissions (POST /api/boards/{board}/questions) complete in under 1 second, even when a talk ends and everyone asks at once.",
+    "service": "askonce",
+    "budgetingMethod": "Occurrences",
+    "timeWindow": [
+      {
+        "duration": "28d",
+        "isRolling": true
+      }
+    ],
+    "indicator": {
+      "metadata": {
+        "name": "askonce-question-latency-sli"
+      },
+      "spec": {
+        "ratioMetric": {
+          "counter": false,
+          "good": {
+            "metricSource": {
+              "type": "Prometheus",
+              "spec": {
+                "query": "histogram_fraction(0, 1, sum(increase({otel_metric_name=\"http.server.request.duration\", service_name=\"askonce\", http_route=\"/api/boards/{board}/questions\", http_request_method=\"POST\"}[5m]))) * histogram_count(sum(increase({otel_metric_name=\"http.server.request.duration\", service_name=\"askonce\", http_route=\"/api/boards/{board}/questions\", http_request_method=\"POST\"}[5m])))"
+              }
+            }
+          },
+          "total": {
+            "metricSource": {
+              "type": "Prometheus",
+              "spec": {
+                "query": "histogram_count(sum(increase({otel_metric_name=\"http.server.request.duration\", service_name=\"askonce\", http_route=\"/api/boards/{board}/questions\", http_request_method=\"POST\"}[5m])))"
+              }
+            }
+          }
+        }
+      }
+    },
+    "objectives": [
+      {
+        "displayName": "Under 1 second",
+        "target": 0.95
+      }
+    ]
+  }
+}
