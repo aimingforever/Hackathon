@@ -1,73 +1,86 @@
 # AskOnce — 3-minute demo video script
 
 Target: 2:50 (10 s buffer). Speak slowly; ~140 words per minute. Times are cumulative.
+Record each section separately, then join them.
 
 ## Before recording (setup checklist)
 
 - [ ] `kubectl -n askonce port-forward svc/askonce 8081:80` is running
-- [ ] Chrome window 1: `http://localhost:8081/` (home page)
+- [ ] Chrome window 1: `http://localhost:8081/` (home page) → click **Load sample board** once
 - [ ] Chrome window 2, phone size (DevTools → device toolbar → iPhone): `http://localhost:8081/ask.html?board=demo-k8s-talk`
 - [ ] Chrome window 3: `http://localhost:8081/board.html?board=demo-k8s-talk` (speaker board)
-- [ ] Dash0 tabs: Services → askonce (Overview, time range covering 12:15–now), Logging filtered on `Slow submission`, one slow trace open, Agent0 chat, SLOs, Websites → askonce-web
-- [ ] Radar tab: the finished AI investigation of deployment/askonce
-- [ ] GitHub tabs: PR #7 (Gitar auto-apply commit), PR #8 (Gitar security findings), PR #9 (the perf fix story), `.gitar/review/main.md`
-- [ ] Terminal with `demo/load-test.sh 40 20 demo-k8s-talk http://localhost:8081` typed but not run
+- [ ] Kibana: dashboard **AskOnce: live Q&A**; Agent Builder → Tools filtered on `askonce`; Workflows → **AskOnce board snapshot** (executions tab)
+- [ ] Terminal ready with the Agent Builder MCP call (see "Commands" below)
+- [ ] Dash0: Services → askonce Overview (time range 12:00–now), one slow trace open, Logging filtered on `Slow submission`, Agent0 chat, SLOs, Dashboards → **AskOnce: health**, Websites → askonce-web
+- [ ] Radar: the finished AI investigation of deployment/askonce
+- [ ] GitHub: PR #7 (Gitar auto-apply commit), PR #8 (Gitar security finding), PR #9 (perf fix story), PR #12 (CI + rules), `.gitar/rules/`
 
 ---
 
-## 0:00 – 0:15 · The problem (home page)
+## 0:00 – 0:12 · The problem (home page)
 
-> "At every conference talk, Q&A is short — and the same question gets asked three different ways. Meanwhile, the people who never raise their hand never get heard. This is **AskOnce**: ask once, heard by everyone."
+> "At every conference talk, Q&A is short — and the same question gets asked three different ways. The people who never raise their hand never get heard. This is **AskOnce**: ask once, heard by everyone."
 
-## 0:15 – 0:55 · Live demo (ask page + speaker board side by side)
+## 0:12 – 0:45 · Live demo (phone page + speaker board side by side)
 
-Click **Load sample board** on the home page, then switch to the two windows.
+Type on the phone page: *Is Kubernetes too complex for a team of five engineers?* → green "Someone already asked this".
 
-> "Here's a Kubernetes talk at this hackathon. Attendees ask from their phones."
+> "This Kubernetes talk already has 22 questions. AskOnce sees that mine means the same as *'Is Kubernetes overkill for a small team?'* — so it adds a vote instead of a duplicate. The speaker sees each question once, ranked, with the other wordings underneath."
 
-Type on the phone page: *Is Kubernetes too complex for a team of five engineers?* → the green "Someone already asked this" message appears.
+On the speaker board, type **Postgres** in *Find a question*.
 
-> "AskOnce noticed this means the same as *'Is Kubernetes overkill for a small team?'* — so instead of a duplicate, it adds a vote. The speaker sees each question once, ranked by how many people asked it, with the other wordings underneath."
+> "The speaker can search too — 'Postgres' finds the databases question even though the word is never used."
 
-Point at the stats line on the speaker board: *22 asked · 12 unique · 10 duplicates merged*.
+## 0:45 – 1:20 · Elasticsearch, end to end
 
-## 0:55 – 1:20 · How it works (Elasticsearch)
+Show README table → Kibana dashboard → Agent Builder tools / terminal.
 
-Show the README architecture or Kibana Discover on the `questions` index.
+> "Elasticsearch is the whole data layer. Questions are `semantic_text`, embedded by ELSER running inside Elasticsearch. Every question at a Kubernetes talk says 'Kubernetes', so raw scores merged twelve different questions into one; we down-weight the talk's own topic words — 6 wrong groups became 12 correct ones. Search is hybrid: fuzzy keywords and semantic, fused with RRF. Aggregations drive the stats, an Elastic Workflow snapshots every board every five minutes into this Kibana dashboard, and Agent Builder exposes our ES|QL tools over MCP, so an AI assistant can brief the speaker."
 
-> "Elasticsearch is the core. Every question is a `semantic_text` field embedded by ELSER, running locally inside Elasticsearch. A semantic search finds candidate duplicates. But at a Kubernetes talk, *every* question says 'Kubernetes' — raw scores merged twelve different questions into one. So AskOnce down-weights the talk's own topic words: same 22 questions, 6 wrong groups before, 12 correct groups after."
+## 1:20 – 2:10 · Production story (Dash0 + Radar)
 
-## 1:20 – 2:15 · Production story (Dash0 + Radar)
+Show the load test result, then Dash0 Overview (22 s spike).
 
-Run the load test in the terminal (or show the earlier result).
+> "Then we simulated the end of a talk: 40 people asking at once. Median wait: almost **20 seconds**. Dash0 caught it — Agent0 flagged p95 at 17 seconds and slow Elasticsearch calls; the trace shows the time in `board_lock.wait`, and the logs say *waited 19 seconds for the board lock*."
 
-> "Then we tested the moment a talk ends: 40 people asking at once. Median wait: **almost 20 seconds**."
+Radar AI investigation.
 
-Dash0 → Services → askonce Overview: point at the 22 s spike.
+> "Radar's AI investigation on our cluster found the same queue — 18 waiters — and five hardening gaps, which we fixed."
 
-> "Dash0 caught it. Agent0 flagged p95 latency of 17 seconds and slow Elasticsearch calls. The trace shows where the time goes: `board_lock.wait`, while a write waited about a second for an index refresh. The logs say it too: *waited 19 seconds for the board lock*."
+Dash0 dashboard / SLO.
 
-Radar → AI investigation.
+> "The cause: a write held the lock while waiting for an index refresh. After the fix: **0.47 seconds** — forty times faster. Now an SLO, an alert and a dashboard keep it there, and real-user monitoring shows what attendees' browsers see."
 
-> "Radar's AI investigation, on our kind cluster, independently found the same queue — 18 waiters, 19-second waits — and flagged five hardening gaps in our Deployment."
+## 2:10 – 2:35 · How we shipped (Gitar)
 
-Back to Dash0 Overview after the fix / SLO page.
+GitHub PR list → PR #7 → `.gitar/rules`.
 
-> "The fix: stop holding the lock while waiting for a refresh. Median latency dropped from **19.8 seconds to 0.47** — forty times faster — and we track it with an SLO: 95% of questions answered within a second. Real-user monitoring shows what attendees' browsers see, too."
+> "Every feature landed through a pull request reviewed by Gitar, with our own review instructions and repository rules — like keeping Radar's hardening in place. CI runs on every PR, and Gitar's auto-apply pushed real fixes: a failing test and a race that duplicated questions. It even caught that anyone could wipe a live board."
 
-## 2:15 – 2:40 · How we shipped (Gitar)
-
-GitHub: PR list → PR #7 commit by Gitar → PR #8 findings.
-
-> "Every feature landed through a pull request reviewed by Gitar, using our own rules in `.gitar/review` — like *never hardcode secrets*. Gitar's auto-apply pushed real fixes: a failing test, and a race that created duplicate groups. It also caught that anyone could wipe a live board — we fixed that before the demo."
-
-## 2:40 – 2:55 · Close
+## 2:35 – 2:50 · Close
 
 Back to the speaker board.
 
-> "AskOnce: Elasticsearch for meaning, Dash0 and Radar to keep it fast under a rush, Gitar to keep every change safe. Next: a multilingual model, so a question in Chinese merges with the same one in English. Ask once — heard by everyone."
+> "AskOnce: Elasticsearch for meaning, Dash0 and Radar to stay fast under a rush, Gitar to keep every change safe. Next: a multilingual model, so the same question in Chinese and English merges. Ask once — heard by everyone."
 
 ---
+
+## Commands
+
+Agent Builder over MCP (top questions for the speaker):
+
+```bash
+set -a; source ~/elastic-start-local/.env; set +a
+curl -s -u "elastic:$ES_LOCAL_PASSWORD" -X POST localhost:5601/api/agent_builder/mcp \
+  -H 'kbn-xsrf: true' -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"askonce_board_stats","arguments":{"board":"demo-k8s-talk"}}}'
+```
+
+Load test against the cluster:
+
+```bash
+demo/load-test.sh 40 20 demo-k8s-talk http://localhost:8081
+```
 
 ## Numbers to quote (all measured today)
 
@@ -75,10 +88,11 @@ Back to the speaker board.
 |---|---|
 | Sample board | 22 questions → 12 groups, 0 wrong merges |
 | Without topic awareness | 6 groups (one swallows 12 different Kubernetes questions) |
+| Hybrid search | "Postgres" → databases question; "kubernets secrets" (typo) → secrets question |
 | Load test before fix (40 attendees, 20 concurrent) | p50 19.8 s |
 | After fix | p50 0.47 s (200 attendees / 50 concurrent: p50 1.12 s) |
 | Root cause | `refresh=wait_for` write: 1,127 ms vs 11 ms with `refresh=true` |
 | Dash0 Agent0 | p95 17 s, worst request 27 s, slow ES calls p95 987 ms |
 | Radar | 18 waiters / ~19 s waits; 5 hardening findings fixed |
 | Dash0 RUM | 224 browser events from `askonce-web` |
-| Gitar | Reviewed every PR (#4–#12); auto-apply fixes in #4 and #7 |
+| Gitar | Reviewed every PR; auto-apply fixes in #4 and #7; caught an unauthenticated reset in #8 |
