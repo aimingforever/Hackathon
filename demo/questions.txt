@@ -1,0 +1,33 @@
+# Demo questions for an eBPF talk. Lines in the same block mean the same thing
+# and should be merged into one group. Lines starting with # are ignored.
+
+# Overhead (expected: merged)
+Does eBPF add much overhead?
+What's the performance overhead of eBPF in production?
+How much CPU overhead do eBPF programs add?
+
+# Slides (expected: merged)
+Will the slides be shared after the talk?
+Where can I get the presentation slides?
+Are the slides available online?
+
+# Kernel version (expected: merged)
+Which kernel version do I need for eBPF?
+What is the minimum Linux kernel version supported?
+Which Linux kernel versions support this?
+
+# Security (expected: merged)
+Can eBPF programs be a security risk?
+What are the security risks of running eBPF?
+
+# Getting started (expected: merged)
+What's the best way to start learning eBPF?
+Any recommended resources for eBPF beginners?
+
+# Unique questions (expected: separate, even though they mention eBPF)
+Does eBPF work on Windows?
+How does this compare to Falco?
+Can eBPF replace sidecars in a service mesh?
+
+# Hard paraphrase (no shared key words; ELSER keeps it separate, a dense model would merge it with Slides)
+Can you post the deck online?
