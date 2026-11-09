@@ -3,10 +3,10 @@
 # Usage: demo/submit-questions.sh [board] [questions-file] [base-url] [topic]
 set -euo pipefail
 
-BOARD="${1:-demo-ebpf-talk}"
+BOARD="${1:-demo-k8s-talk}"
 FILE="${2:-$(dirname "$0")/questions.txt}"
 BASE_URL="${3:-http://localhost:8080}"
-TOPIC="${4:-eBPF in production: observability, networking and security in the Linux kernel}"
+TOPIC="${4:-Kubernetes in production: lessons learned from running clusters at scale}"
 
 # The board topic tells the engine which words every question will share, so they don't count as similarity.
 curl -s -X PUT "$BASE_URL/api/boards/$BOARD" -H 'Content-Type: application/json' \

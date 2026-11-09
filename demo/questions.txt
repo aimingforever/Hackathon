@@ -1,33 +1,43 @@
-# Demo questions for an eBPF talk. Lines in the same block mean the same thing
-# and should be merged into one group. Lines starting with # are ignored.
+# Demo questions for a "Kubernetes in production" talk at the Cloud Native Hackathon.
+# Lines in the same block mean the same thing and should be merged into one group.
+# Lines starting with # are ignored.
 
-# Overhead (expected: merged)
-Does eBPF add much overhead?
-What's the performance overhead of eBPF in production?
-How much CPU overhead do eBPF programs add?
+# Small teams (expected: merged)
+Is Kubernetes overkill for a small team?
+Do small startups really need Kubernetes?
+Is Kubernetes too complex for a team of five engineers?
+
+# Databases (expected: merged)
+Should I run databases on Kubernetes?
+Is it safe to run a database like Postgres on Kubernetes?
+Do you recommend running stateful databases on Kubernetes?
+
+# Secrets (expected: merged)
+How do you manage secrets in Kubernetes?
+What's the best way to handle Kubernetes secrets?
+
+# Dash0 (expected: merged)
+How does Dash0 find the root cause of slow requests?
+Can Dash0's Agent0 explain why my service is slow?
+
+# Radar (expected: merged)
+Can Radar's AI investigate a crashing pod?
+How does Radar debug a pod stuck in CrashLoopBackOff?
+
+# Gitar (expected: merged)
+Can Gitar fix failing CI automatically?
+Does Gitar auto-fix broken builds in pull requests?
+
+# Elasticsearch (expected: merged)
+Can Elasticsearch do semantic search without an external model?
+Does Elasticsearch support semantic search with built-in models like ELSER?
 
 # Slides (expected: merged)
 Will the slides be shared after the talk?
 Where can I get the presentation slides?
-Are the slides available online?
 
-# Kernel version (expected: merged)
-Which kernel version do I need for eBPF?
-What is the minimum Linux kernel version supported?
-Which Linux kernel versions support this?
-
-# Security (expected: merged)
-Can eBPF programs be a security risk?
-What are the security risks of running eBPF?
-
-# Getting started (expected: merged)
-What's the best way to start learning eBPF?
-Any recommended resources for eBPF beginners?
-
-# Unique questions (expected: separate, even though they mention eBPF)
-Does eBPF work on Windows?
-How does this compare to Falco?
-Can eBPF replace sidecars in a service mesh?
-
-# Hard paraphrase (no shared key words; ELSER keeps it separate, a dense model would merge it with Slides)
-Can you post the deck online?
+# Unique questions (expected: separate, even though they all mention Kubernetes, the talk topic)
+How do you keep Kubernetes cloud costs down?
+How long does a Kubernetes upgrade usually take?
+Which service mesh do you recommend for Kubernetes?
+How do you do disaster recovery for a Kubernetes cluster?
