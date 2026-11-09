@@ -99,7 +99,7 @@ AskOnce runs in a local [kind](https://kind.sigs.k8s.io/) cluster connected to [
 
 ## Set up the Elastic and Dash0 extras (optional)
 
-These scripts recreate everything we configured outside the app. Each one is safe to run again.
+These scripts recreate everything we configured outside the app. `setup-agent-builder.sh` is safe to run again (it updates existing tools). Run the other two once: each run of `setup-workflows.sh` or `setup-dashboard.sh` creates another workflow or dashboard.
 
 ```bash
 set -a; source ~/elastic-start-local/.env; set +a
