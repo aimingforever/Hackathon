@@ -1,3 +1,8 @@
 # Hackathon
-initial setting
-first pr
+
+Workspace for hackathon experiments.
+
+## Status
+
+- initial setting
+- first pr

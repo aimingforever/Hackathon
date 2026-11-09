@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: goodfish
+  elasticsearch:
+    uris: http://localhost:9200
+    username: elastic
+    password: qgKNPCy4
