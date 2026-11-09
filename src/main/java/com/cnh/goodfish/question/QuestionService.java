@@ -96,7 +96,10 @@ public class QuestionService {
     public SubmitResult submit(String board, String text) {
         Span span = telemetry.tracer.spanBuilder("askonce.submit").setAttribute(QuestionTelemetry.BOARD, board).startSpan();
         try (Scope ignored = span.makeCurrent()) {
-            SubmitResult result = withBoardLock(board, () -> doSubmit(board, text));
+            String question = text.strip();
+            // Embedding does not depend on other submissions, so it runs before taking the board lock.
+            Map<String, Float> tokens = telemetry.inSpan("askonce.embed", () -> embedder.embed(question));
+            SubmitResult result = withBoardLock(board, () -> doSubmit(board, question, tokens));
             String outcome = result.merged() ? "merged" : "new";
             span.setAttribute(QuestionTelemetry.MERGED, result.merged());
             telemetry.submitted.add(1, Attributes.of(QuestionTelemetry.BOARD, board, QuestionTelemetry.RESULT, outcome));
@@ -137,9 +140,7 @@ public class QuestionService {
         }
     }
 
-    private SubmitResult doSubmit(String board, String text) {
-        String question = text.strip();
-        Map<String, Float> tokens = telemetry.inSpan("askonce.embed", () -> embedder.embed(question));
+    private SubmitResult doSubmit(String board, String question, Map<String, Float> tokens) {
         List<QuestionGroup> candidates = telemetry.inSpan("askonce.find_candidates", () -> candidates(board, question));
         Span.current().setAttribute(QuestionTelemetry.CANDIDATES, (long) candidates.size());
         Match best = bestMatch(candidates, tokens, boards.topicWeights(board));
@@ -148,14 +149,14 @@ public class QuestionService {
             QuestionGroup merged = telemetry.inSpan("askonce.merge", () -> update(best.id(), MERGE_SCRIPT, Map.of(
                     "text", JsonData.of(question),
                     "tokens", JsonData.of(tokens),
-                    "maxVariants", JsonData.of(MAX_VARIANTS))));
+                    "maxVariants", JsonData.of(MAX_VARIANTS)), Refresh.True));
             return new SubmitResult(QuestionView.of(merged), true, best.similarity());
         }
 
         QuestionGroup group = QuestionGroup.create(UUID.randomUUID().toString(), board, question, tokens, clock.millis());
         telemetry.inSpan("askonce.create_group", () -> {
             try {
-                return client.index(i -> i.index(properties.index()).id(group.id()).document(group).refresh(Refresh.WaitFor));
+                return client.index(i -> i.index(properties.index()).id(group.id()).document(group).refresh(Refresh.True));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -178,7 +179,7 @@ public class QuestionService {
     }
 
     public QuestionView upvote(String id) {
-        return QuestionView.of(update(id, UPVOTE_SCRIPT, Map.of()));
+        return QuestionView.of(update(id, UPVOTE_SCRIPT, Map.of(), Refresh.WaitFor));
     }
 
     public List<QuestionView> top(String board, int limit) {
@@ -234,7 +235,12 @@ public class QuestionService {
         }
     }
 
-    private QuestionGroup update(String id, String script, Map<String, JsonData> extraParams) {
+    /**
+     * Applies a scripted update. Inside the board lock we use {@link Refresh#True}: the next submission
+     * must see this change, and {@link Refresh#WaitFor} would hold the lock for up to a full refresh
+     * interval (about 1 s), queueing every other submission on the board behind it.
+     */
+    private QuestionGroup update(String id, String script, Map<String, JsonData> extraParams, Refresh refresh) {
         Map<String, JsonData> params = new HashMap<>(extraParams);
         params.put("now", JsonData.of(clock.millis()));
         try {
@@ -242,7 +248,7 @@ public class QuestionService {
                             .index(properties.index())
                             .id(id)
                             .retryOnConflict(5)
-                            .refresh(Refresh.WaitFor)
+                            .refresh(refresh)
                             .source(src -> src.filter(f -> f.includes(QuestionGroup.SOURCE_FIELDS)))
                             .script(sc -> sc.source(s -> s.scriptString(script)).params(params)),
                     QuestionGroup.class);
