@@ -1,0 +1,12 @@
+{
+  "mappings": {
+    "properties": {
+      "@timestamp":        { "type": "date" },
+      "board":             { "type": "keyword" },
+      "questions":         { "type": "integer" },
+      "unique_questions":  { "type": "integer" },
+      "duplicates_merged": { "type": "integer" },
+      "votes":             { "type": "integer" }
+    }
+  }
+}
