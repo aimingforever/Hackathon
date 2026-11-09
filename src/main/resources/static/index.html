@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AskOnce</title>
+  <link rel="stylesheet" href="/css/askonce.css">
+</head>
+<body>
+<main>
+  <h1 class="brand">AskOnce</h1>
+  <p class="tagline">Ask once. Heard by everyone.</p>
+
+  <form id="create" class="card">
+    <label for="board">Board name</label>
+    <input id="board" required placeholder="ebpf-talk" pattern="[a-z0-9][a-z0-9-]{0,39}" autocomplete="off">
+    <p class="hint">Lowercase letters, numbers and dashes. Use one board per talk.</p>
+
+    <label for="topic">What is the talk about?</label>
+    <textarea id="topic" required maxlength="1000"
+              placeholder="eBPF in production: observability, networking and security in the Linux kernel"></textarea>
+    <p class="hint">Words from the topic are shared by every question, so AskOnce ignores them when looking for duplicates.</p>
+
+    <button type="submit">Create board</button>
+    <p id="error" class="feedback hidden"></p>
+  </form>
+
+  <div id="links" class="card hidden">
+    <p><strong>Board ready.</strong></p>
+    <p>Attendees ask here: <a id="ask-link"></a></p>
+    <p>Speaker screen: <a id="board-link"></a></p>
+  </div>
+</main>
+<script src="/js/askonce.js"></script>
+<script>
+  const form = document.getElementById('create');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const board = document.getElementById('board').value.trim();
+    const topic = document.getElementById('topic').value.trim();
+    const error = document.getElementById('error');
+    error.classList.add('hidden');
+    try {
+      await AskOnce.setTopic(board, topic);
+      for (const [id, page] of [['ask-link', 'ask'], ['board-link', 'board']]) {
+        const link = document.getElementById(id);
+        link.href = `/${page}.html?board=${board}`;
+        link.textContent = `${location.origin}/${page}.html?board=${board}`;
+      }
+      document.getElementById('links').classList.remove('hidden');
+    } catch (e) {
+      error.textContent = 'Could not create the board. Check the name and try again.';
+      error.classList.remove('hidden');
+    }
+  });
+</script>
+</body>
+</html>
