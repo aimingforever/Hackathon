@@ -1,0 +1,21 @@
+{
+  "id": "askonce.search_questions",
+  "type": "esql",
+  "tags": [
+    "askonce"
+  ],
+  "description": "Hybrid search over the questions on an AskOnce board: keyword (fuzzy) and semantic (ELSER) results fused with RRF via ES|QL FORK and FUSE. 'Postgres' finds questions about databases, 'kubernets secrets' still finds the secrets question.",
+  "configuration": {
+    "query": "FROM questions METADATA _score, _id, _index | WHERE board == ?board | FORK (WHERE MATCH(keywords, ?query, {\"fuzziness\": \"AUTO\"}) | SORT _score DESC | LIMIT 10) (WHERE MATCH(text, ?query) OR MATCH(variants, ?query) | SORT _score DESC | LIMIT 10) | FUSE | SORT _score DESC | KEEP text, asks, votes, _score | LIMIT 5",
+    "params": {
+      "board": {
+        "type": "string",
+        "description": "AskOnce board name, for example demo-k8s-talk"
+      },
+      "query": {
+        "type": "string",
+        "description": "What to look for, in natural language"
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "askonce.top_questions",
+  "type": "esql",
+  "tags": [
+    "askonce"
+  ],
+  "description": "Top questions on an AskOnce board, ranked by how many attendees asked them plus upvotes. Use this to tell a speaker what the audience most wants to know.",
+  "configuration": {
+    "query": "FROM questions | WHERE board == ?board | SORT popularity DESC, updatedAt DESC | KEEP text, asks, votes, popularity, variants | LIMIT 10",
+    "params": {
+      "board": {
+        "type": "string",
+        "description": "AskOnce board name, for example demo-k8s-talk"
+      }
+    }
+  }
+}

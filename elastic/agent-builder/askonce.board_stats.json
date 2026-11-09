@@ -1,0 +1,17 @@
+{
+  "id": "askonce.board_stats",
+  "type": "esql",
+  "tags": [
+    "askonce"
+  ],
+  "description": "Statistics for an AskOnce board: total questions asked, unique questions after merging duplicates, duplicates merged and votes.",
+  "configuration": {
+    "query": "FROM questions | WHERE board == ?board | STATS questions = SUM(asks), unique_questions = COUNT(*), votes = SUM(votes), busiest = MAX(asks) | EVAL duplicates_merged = questions - unique_questions",
+    "params": {
+      "board": {
+        "type": "string",
+        "description": "AskOnce board name, for example demo-k8s-talk"
+      }
+    }
+  }
+}
