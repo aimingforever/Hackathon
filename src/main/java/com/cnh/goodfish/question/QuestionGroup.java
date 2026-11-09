@@ -18,6 +18,7 @@ import java.util.Map;
  * @param popularity    asks + votes, used for ranking
  * @param createdAt     epoch millis
  * @param updatedAt     epoch millis
+ * @param keywords      every wording as plain text, for the keyword half of hybrid search
  */
 public record QuestionGroup(
         String id,
@@ -29,7 +30,8 @@ public record QuestionGroup(
         int votes,
         int popularity,
         long createdAt,
-        long updatedAt) {
+        long updatedAt,
+        List<String> keywords) {
 
     /** Fields we read back from Elasticsearch (excludes inference data stored for semantic_text). */
     static final List<String> SOURCE_FIELDS = List.of(
@@ -37,6 +39,6 @@ public record QuestionGroup(
             "asks", "votes", "popularity", "createdAt", "updatedAt");
 
     static QuestionGroup create(String id, String board, String text, Map<String, Float> tokens, long now) {
-        return new QuestionGroup(id, board, text, List.of(text), List.of(tokens), 1, 0, 1, now, now);
+        return new QuestionGroup(id, board, text, List.of(text), List.of(tokens), 1, 0, 1, now, now, List.of(text));
     }
 }

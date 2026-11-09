@@ -31,6 +31,9 @@ class QuestionControllerTests {
     @MockitoBean
     BoardService boards;
 
+    @MockitoBean
+    BoardInsightsService insights;
+
     private static final QuestionView GROUP = new QuestionView(
             "g1", "keynote", "Does eBPF add much overhead?",
             List.of("Does eBPF add much overhead?", "Is eBPF slow?"), 2, 1, 3, 1L, 2L);
@@ -94,6 +97,34 @@ class QuestionControllerTests {
         given(boards.get("nope")).willReturn(java.util.Optional.empty());
 
         mvc.perform(get("/api/boards/nope")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void hybridSearchReturnsRankedGroups() throws Exception {
+        given(insights.search("keynote", "Postgres", 10))
+                .willReturn(List.of(new BoardInsightsService.SearchHit(GROUP, 0.048)));
+
+        mvc.perform(get("/api/boards/keynote/search").param("q", "Postgres"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].group.id").value("g1"))
+                .andExpect(jsonPath("$[0].score").value(0.048));
+    }
+
+    @Test
+    void searchRequiresAQuery() throws Exception {
+        mvc.perform(get("/api/boards/keynote/search").param("q", " "))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void statsComeFromAggregations() throws Exception {
+        given(insights.stats("keynote")).willReturn(
+                new BoardInsightsService.BoardStats(22, 12, 10, 10 / 22.0, 3, 3, List.of()));
+
+        mvc.perform(get("/api/boards/keynote/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.questions").value(22))
+                .andExpect(jsonPath("$.duplicatesMerged").value(10));
     }
 
     @Test

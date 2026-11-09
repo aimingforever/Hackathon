@@ -21,6 +21,11 @@
       <div id="ask-url" class="url hint"></div>
     </div>
   </div>
+  <form id="find" class="card row" style="margin-bottom: 16px">
+    <input id="find-q" type="search" placeholder="Find a question: try “Postgres” or “kubernets secrets”" autocomplete="off">
+    <button type="submit" class="ghost">Find</button>
+  </form>
+  <div id="results" class="hidden"></div>
   <div id="list"></div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -31,11 +36,30 @@
   const list = document.getElementById('list');
   const lastAsks = new Map();
 
-  function render(groups) {
-    const people = groups.reduce((sum, g) => sum + g.asks, 0);
-    const saved = people - groups.length;
+  async function renderStats() {
+    // Computed by Elasticsearch aggregations (GET /api/boards/{board}/stats).
+    const s = await AskOnce.stats(board);
     document.getElementById('stats').textContent =
-        `${people} questions asked · ${groups.length} unique · ${saved} duplicates merged`;
+        `${s.questions} questions asked · ${s.groups} unique · ${s.duplicatesMerged} duplicates merged` +
+        (s.questions ? ` (${Math.round(s.mergeRate * 100)}%)` : '');
+  }
+
+  // Hybrid search (keyword + semantic, fused with RRF) over this board.
+  document.getElementById('find').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const q = document.getElementById('find-q').value.trim();
+    const results = document.getElementById('results');
+    if (!q) { results.classList.add('hidden'); return; }
+    const hits = await AskOnce.search(board, q);
+    results.classList.remove('hidden');
+    results.replaceChildren(
+        el('p', { class: 'hint' }, hits.length ? `Best matches for “${q}” (hybrid keyword + semantic search):` : `No match for “${q}”.`),
+        ...hits.map((h) => el('div', { class: 'card question' },
+            el('div', { class: 'count' }, String(h.group.popularity), el('small', {}, 'votes')),
+            el('div', { class: 'body' }, el('div', { class: 'text' }, h.group.text)))));
+  });
+
+  function render(groups) {
 
     list.replaceChildren(...groups.map((g) => {
       const others = g.variants.filter((v) => v !== g.text);
@@ -54,7 +78,10 @@
   }
 
   async function refresh() {
-    try { render(await AskOnce.top(board)); } catch { /* keep the last list on network errors */ }
+    try {
+      render(await AskOnce.top(board));
+      await renderStats();
+    } catch { /* keep the last list on network errors */ }
   }
 
   if (!board) {

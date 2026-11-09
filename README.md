@@ -25,10 +25,10 @@ The embedding model is a config setting (`goodfish.questions.inference-id`), so 
 
 | Sponsor tool | How AskOnce uses it |
 |---|---|
-| Elasticsearch | Core data store; ELSER semantic search for duplicate detection |
-| Gitar | Every feature lands through a reviewed PR; project rules in `.gitar/review/` |
-| Dash0 | OpenTelemetry traces, logs and metrics (in progress) |
-| Radar | Runs on a kind Kubernetes cluster connected to Radar Cloud; used to deploy, watch and troubleshoot |
+| **Elasticsearch** | Core data store for questions and boards. `semantic_text` with **ELSER** running locally (inference API) for duplicate detection, plus our topic-aware similarity. **Hybrid search**: an RRF retriever fusing fuzzy keyword and semantic retrievers (`GET /search`). **Aggregations** for board stats. **ES\|QL** everywhere: `FORK`/`FUSE` hybrid search, `STATS`. **Agent Builder**: 3 ES\|QL tools and a speaker-assistant agent, called over **MCP** (`elastic/agent-builder`). **Workflows**: a scheduled workflow snapshots board stats into a time-series index (`elastic/workflows`). **Kibana dashboard** built from ES\|QL panels (`elastic/dashboards`). |
+| **Dash0** | OpenTelemetry Java agent plus custom spans and metrics (board lock wait, merged vs new, similarity), logs, Elasticsearch shown as its own service, and **real-user monitoring** in the browser. **Agent0** found our 20-second slowdown. **SLO** (95% of questions under 1 s), **check rule** alert, and a **dashboard**, all as code in `observability/`. |
+| **Radar** | AskOnce runs on a kind cluster connected to Radar Cloud. We used Radar's **MCP** throughout (resources, issues, changes) and an **AI investigation** that found the lock-wait queue and 5 hardening gaps, which we then fixed in `k8s/askonce.yaml`. |
+| **Gitar** | Every feature landed through a Gitar-reviewed PR. Project-aware **review instructions** (`.gitar/review/`) and **repository rules** (`.gitar/rules/`). **Auto-apply** fixed a failing test and a duplicate-group race; reviews also caught an unauthenticated board reset and a metric-cardinality issue. **CI** in GitHub Actions for failure diagnosis. |
 
 ## API
 
@@ -37,6 +37,10 @@ The embedding model is a config setting (`goodfish.questions.inference-id`), so 
 | `PUT /api/boards/{board}` | Set the board topic, e.g. `{"topic": "Kubernetes in production"}` |
 | `POST /api/boards/{board}/questions` | Submit `{"text": "..."}`; returns the group and whether it was merged |
 | `GET /api/boards/{board}/questions` | Groups ranked by asks + votes |
+| `GET /api/boards/{board}/search?q=...` | Hybrid search: keyword (English analyzer, fuzzy) + semantic (ELSER), fused with RRF |
+| `GET /api/boards/{board}/stats` | Board statistics from Elasticsearch aggregations (questions, unique, merged, votes, timeline) |
+| `DELETE /api/boards/{board}/questions` | Reset a board; only `demo-*` boards, or with the `X-Admin-Token` header |
+| `GET /api/rum-config` | Dash0 browser monitoring config (endpoint + ingest-only token from the environment) |
 | `POST /api/questions/{id}/upvote` | Upvote a group |
 
 ## Run it locally

@@ -1,0 +1,17 @@
+{
+  "id": "askonce-speaker-assistant",
+  "name": "AskOnce speaker assistant",
+  "description": "Helps a speaker or organizer understand the live Q&A on an AskOnce board.",
+  "configuration": {
+    "instructions": "You help conference speakers run Q&A. Use the askonce.* tools. Always name the board you looked at. Summarize the top questions in the order the audience ranked them, mention how many people asked each, and point out themes.",
+    "tools": [
+      {
+        "tool_ids": [
+          "askonce.top_questions",
+          "askonce.board_stats",
+          "askonce.search_questions"
+        ]
+      }
+    ]
+  }
+}
