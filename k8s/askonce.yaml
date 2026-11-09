@@ -44,7 +44,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: askonce
-          image: askonce:0.5.0
+          image: askonce:0.5.1
           imagePullPolicy: IfNotPresent # image is loaded into kind with `kind load docker-image`
           ports:
             - name: http
@@ -98,8 +98,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            # service.version must match the image tag, so Dash0 can attribute changes to deploys.
             - name: OTEL_RESOURCE_ATTRIBUTES
-              value: service.namespace=askonce,deployment.environment.name=hackathon,k8s.cluster.name=cnh,k8s.namespace.name=askonce,k8s.deployment.name=askonce,k8s.pod.name=$(K8S_POD_NAME),k8s.node.name=$(K8S_NODE_NAME)
+              value: service.namespace=askonce,service.version=0.5.1,deployment.environment.name=hackathon,k8s.cluster.name=cnh,k8s.namespace.name=askonce,k8s.deployment.name=askonce,k8s.pod.name=$(K8S_POD_NAME),k8s.node.name=$(K8S_NODE_NAME)
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

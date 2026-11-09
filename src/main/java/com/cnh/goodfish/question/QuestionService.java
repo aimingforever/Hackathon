@@ -53,9 +53,9 @@ public class QuestionService {
             ctx._source.popularity += 1;
             ctx._source.updatedAt = params.now;
             if (ctx._source.variants.size() < params.maxVariants && !ctx._source.variants.contains(params.text)) {
+              if (ctx._source.keywords == null) { ctx._source.keywords = new ArrayList(ctx._source.variants); }
               ctx._source.variants.add(params.text);
               ctx._source.variantTokens.add(params.tokens);
-              if (ctx._source.keywords == null) { ctx._source.keywords = new ArrayList(); }
               ctx._source.keywords.add(params.text);
             }
             """;

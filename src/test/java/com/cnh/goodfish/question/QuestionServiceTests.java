@@ -123,6 +123,14 @@ class QuestionServiceTests {
     }
 
     @Test
+    void keywordsBackfillTargetsOnlyDocumentsMissingKeywordsAndSeedsFromVariants() {
+        String request = QuestionIndexInitializer.BACKFILL_KEYWORDS_REQUEST;
+
+        assertThat(request).contains("must_not").contains("\"exists\"").contains("\"field\": \"keywords\"");
+        assertThat(request).contains("ctx._source.keywords = new ArrayList(ctx._source.variants)");
+    }
+
+    @Test
     void searchTermsAreSafelyJsonEncoded() {
         assertThat(BoardInsightsService.json("say \"hi\"\n\\ ok")).isEqualTo("\"say \\\"hi\\\"\\n\\\\ ok\"");
         assertThat(BoardInsightsService.json(List.of("a", "b"))).isEqualTo("[\"a\",\"b\"]");
