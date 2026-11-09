@@ -19,7 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(QuestionController.class)
+@WebMvcTest(controllers = QuestionController.class, properties = "goodfish.admin-token=test-admin-token")
 class QuestionControllerTests {
 
     @Autowired
@@ -97,12 +97,27 @@ class QuestionControllerTests {
     }
 
     @Test
-    void clearDeletesBoardQuestions() throws Exception {
-        given(service.clear("keynote")).willReturn(9L);
+    void anyoneCanResetADemoBoard() throws Exception {
+        given(service.clear("demo-ebpf-talk")).willReturn(9L);
 
-        mvc.perform(delete("/api/boards/keynote/questions"))
+        mvc.perform(delete("/api/boards/demo-ebpf-talk/questions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.deleted").value(9));
+    }
+
+    @Test
+    void clearingARealBoardNeedsTheAdminToken() throws Exception {
+        given(service.clear("keynote")).willReturn(3L);
+
+        mvc.perform(delete("/api/boards/keynote/questions"))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/boards/keynote/questions").header("X-Admin-Token", "wrong"))
+                .andExpect(status().isForbidden());
+        verify(service, never()).clear("keynote");
+
+        mvc.perform(delete("/api/boards/keynote/questions").header("X-Admin-Token", "test-admin-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(3));
     }
 
     @Test
