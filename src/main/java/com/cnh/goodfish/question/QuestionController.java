@@ -6,7 +6,11 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -31,12 +36,18 @@ class QuestionController {
 
     static final String BOARD_PATTERN = "[a-z0-9][a-z0-9-]{0,39}";
 
+    /** Boards with this prefix are throwaway demo boards that anyone may reset. */
+    static final String DEMO_BOARD_PREFIX = "demo-";
+
     private final QuestionService questions;
     private final BoardService boards;
+    private final String adminToken;
 
-    QuestionController(QuestionService questions, BoardService boards) {
+    QuestionController(QuestionService questions, BoardService boards,
+                       @Value("${goodfish.admin-token:}") String adminToken) {
         this.questions = questions;
         this.boards = boards;
+        this.adminToken = adminToken;
     }
 
     record SubmitRequest(@NotBlank @Size(min = 3, max = 300) String text) {
@@ -72,9 +83,23 @@ class QuestionController {
         return questions.top(board, limit);
     }
 
+    /**
+     * Clears a board. Demo boards ("demo-*") can be reset by anyone; any other board requires the
+     * X-Admin-Token header to match the configured admin token, so attendees cannot wipe a live board.
+     */
     @DeleteMapping("/boards/{board}/questions")
-    java.util.Map<String, Long> clear(@PathVariable @Pattern(regexp = BOARD_PATTERN) String board) {
-        return java.util.Map.of("deleted", questions.clear(board));
+    ResponseEntity<Map<String, Long>> clear(
+            @PathVariable @Pattern(regexp = BOARD_PATTERN) String board,
+            @RequestHeader(name = "X-Admin-Token", required = false) String token) {
+        if (!board.startsWith(DEMO_BOARD_PREFIX) && !isAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(Map.of("deleted", questions.clear(board)));
+    }
+
+    private boolean isAdmin(String token) {
+        return !adminToken.isBlank() && token != null && MessageDigest.isEqual(
+                adminToken.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8));
     }
 
     @PostMapping("/questions/{id}/upvote")

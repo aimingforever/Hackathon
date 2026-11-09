@@ -3,7 +3,7 @@
 # Usage: demo/submit-questions.sh [board] [questions-file] [base-url] [topic]
 set -euo pipefail
 
-BOARD="${1:-ebpf-talk}"
+BOARD="${1:-demo-ebpf-talk}"
 FILE="${2:-$(dirname "$0")/questions.txt}"
 BASE_URL="${3:-http://localhost:8080}"
 TOPIC="${4:-eBPF in production: observability, networking and security in the Linux kernel}"

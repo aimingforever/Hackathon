@@ -54,7 +54,7 @@ Requirements: Java 25, Docker, `jq` (for the demo script).
    ```
 3. Submit the demo questions and see them merged:
    ```bash
-   demo/submit-questions.sh ebpf-talk
+   demo/submit-questions.sh demo-ebpf-talk
    ```
 
 ## Run it on Kubernetes (kind)

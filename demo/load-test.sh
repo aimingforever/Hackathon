@@ -6,7 +6,7 @@ set -euo pipefail
 
 ATTENDEES="${1:-60}"
 CONCURRENCY="${2:-30}"
-BOARD="${3:-ebpf-talk}"
+BOARD="${3:-demo-ebpf-talk}"
 BASE_URL="${4:-http://localhost:8080}"
 QUESTIONS="$(dirname "$0")/questions.txt"
 

@@ -2,7 +2,7 @@
 // expected to be merged; the "unique" ones share the topic word but must stay separate.
 // Keep in sync with demo/questions.txt.
 const AskOnceSample = {
-  board: 'ebpf-talk',
+  board: 'demo-ebpf-talk',
   topic: 'eBPF in production: observability, networking and security in the Linux kernel',
   questions: [
     'Does eBPF add much overhead?',
