@@ -49,9 +49,9 @@ class QuestionServiceTests {
     @Test
     void bestMatchUsesClosestVariantOfEachGroup() {
         QuestionGroup overhead = new QuestionGroup("g1", "talk", "Does eBPF add much overhead?",
-                List.of("a", "b"), List.of(EBPF_WINDOWS, EBPF_OVERHEAD), 2, 0, 2, 1, 1);
+                List.of("a", "b"), List.of(EBPF_WINDOWS, EBPF_OVERHEAD), 2, 0, 2, 1, 1, List.of("a", "b"));
         QuestionGroup slides = new QuestionGroup("g2", "talk", "Will the slides be shared?",
-                List.of("c"), List.of(SLIDES), 1, 0, 1, 1, 1);
+                List.of("c"), List.of(SLIDES), 1, 0, 1, 1, 1, List.of("c"));
 
         QuestionService.Match best = QuestionService.bestMatch(List.of(slides, overhead), EBPF_OVERHEAD, Map.of());
 
@@ -113,6 +113,19 @@ class QuestionServiceTests {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    @Test
+    void putMappingBodyIsTheInnerMappingsObject() {
+        String body = QuestionIndexInitializer.propertiesOnly(QuestionIndexInitializer.BOARD_MAPPING);
+
+        assertThat(body).startsWith("{").endsWith("}").contains("\"properties\"").doesNotContain("mappings");
+    }
+
+    @Test
+    void searchTermsAreSafelyJsonEncoded() {
+        assertThat(BoardInsightsService.json("say \"hi\"\n\\ ok")).isEqualTo("\"say \\\"hi\\\"\\n\\\\ ok\"");
+        assertThat(BoardInsightsService.json(List.of("a", "b"))).isEqualTo("[\"a\",\"b\"]");
     }
 
     @Test

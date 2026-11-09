@@ -42,5 +42,7 @@ const AskOnce = (() => {
     top: (board, limit = 50) => request('GET', `/api/boards/${board}/questions?limit=${limit}`),
     upvote: (id) => request('POST', `/api/questions/${id}/upvote`),
     clear: (board) => request('DELETE', `/api/boards/${board}/questions`),
+    search: (board, q, limit = 5) => request('GET', `/api/boards/${board}/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+    stats: (board) => request('GET', `/api/boards/${board}/stats`),
   };
 })();

@@ -41,12 +41,14 @@ class QuestionController {
 
     private final QuestionService questions;
     private final BoardService boards;
+    private final BoardInsightsService insights;
     private final String adminToken;
 
-    QuestionController(QuestionService questions, BoardService boards,
+    QuestionController(QuestionService questions, BoardService boards, BoardInsightsService insights,
                        @Value("${goodfish.admin-token:}") String adminToken) {
         this.questions = questions;
         this.boards = boards;
+        this.insights = insights;
         this.adminToken = adminToken;
     }
 
@@ -81,6 +83,21 @@ class QuestionController {
             @PathVariable @Pattern(regexp = BOARD_PATTERN) String board,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
         return questions.top(board, limit);
+    }
+
+    /** Hybrid (keyword + semantic, RRF) search over a board's questions. */
+    @GetMapping("/boards/{board}/search")
+    List<BoardInsightsService.SearchHit> search(
+            @PathVariable @Pattern(regexp = BOARD_PATTERN) String board,
+            @RequestParam @NotBlank @Size(max = 200) String q,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int limit) {
+        return insights.search(board, q, limit);
+    }
+
+    /** Board statistics from Elasticsearch aggregations. */
+    @GetMapping("/boards/{board}/stats")
+    BoardInsightsService.BoardStats stats(@PathVariable @Pattern(regexp = BOARD_PATTERN) String board) {
+        return insights.stats(board);
     }
 
     /**

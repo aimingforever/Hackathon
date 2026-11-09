@@ -37,6 +37,10 @@ The embedding model is a config setting (`goodfish.questions.inference-id`), so 
 | `PUT /api/boards/{board}` | Set the board topic, e.g. `{"topic": "Kubernetes in production"}` |
 | `POST /api/boards/{board}/questions` | Submit `{"text": "..."}`; returns the group and whether it was merged |
 | `GET /api/boards/{board}/questions` | Groups ranked by asks + votes |
+| `GET /api/boards/{board}/search?q=...` | Hybrid search: keyword (English analyzer, fuzzy) + semantic (ELSER), fused with RRF |
+| `GET /api/boards/{board}/stats` | Board statistics from Elasticsearch aggregations (questions, unique, merged, votes, timeline) |
+| `DELETE /api/boards/{board}/questions` | Reset a board; only `demo-*` boards, or with the `X-Admin-Token` header |
+| `GET /api/rum-config` | Dash0 browser monitoring config (endpoint + ingest-only token from the environment) |
 | `POST /api/questions/{id}/upvote` | Upvote a group |
 
 ## Run it locally

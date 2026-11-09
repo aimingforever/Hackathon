@@ -30,6 +30,9 @@ class QuestionServiceElasticsearchIT {
     BoardService boards;
 
     @Autowired
+    BoardInsightsService insights;
+
+    @Autowired
     ElasticsearchClient client;
 
     @AfterEach
@@ -59,6 +62,13 @@ class QuestionServiceElasticsearchIT {
 
         service.upvote(windows.group().id());
         service.upvote(windows.group().id());
+
+        var hits = insights.search("keynote", "presentation deck", 3);
+        assertThat(hits.getFirst().group().id()).isEqualTo(slides.group().id());
+        var stats = insights.stats("keynote");
+        assertThat(stats.questions()).isEqualTo(5);
+        assertThat(stats.groups()).isEqualTo(3);
+        assertThat(stats.duplicatesMerged()).isEqualTo(2);
 
         var ranked = service.top("keynote", 10);
         assertThat(ranked).hasSize(3);

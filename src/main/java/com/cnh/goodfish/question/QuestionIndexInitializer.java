@@ -33,11 +33,21 @@ class QuestionIndexInitializer implements ApplicationRunner {
 
     private void createIfMissing(String index, String mapping) throws IOException {
         if (client.indices().exists(e -> e.index(index)).value()) {
-            log.info("Index '{}' already exists", index);
+            // Adding new fields to an existing mapping is allowed and idempotent.
+            client.indices().putMapping(m -> m.index(index).withJson(new StringReader(propertiesOnly(mapping))));
+            log.info("Index '{}' already exists; mapping updated", index);
             return;
         }
         client.indices().create(c -> c.index(index).withJson(new StringReader(mapping)));
         log.info("Created index '{}'", index);
+    }
+
+    /** Turns {"mappings": {...}} into the {...} body that the put-mapping API expects. */
+    static String propertiesOnly(String mapping) {
+        String body = mapping.strip();
+        int start = body.indexOf('{', body.indexOf("\"mappings\""));
+        int end = body.lastIndexOf('}', body.lastIndexOf('}') - 1);
+        return body.substring(start, end + 1);
     }
 
     String questionMapping() {
@@ -50,6 +60,7 @@ class QuestionIndexInitializer implements ApplicationRunner {
                       "text":          { "type": "semantic_text", "inference_id": "%s" },
                       "variants":      { "type": "semantic_text", "inference_id": "%s" },
                       "variantTokens": { "type": "object", "enabled": false },
+                      "keywords":      { "type": "text", "analyzer": "english" },
                       "asks":          { "type": "integer" },
                       "votes":         { "type": "integer" },
                       "popularity":    { "type": "integer" },
