@@ -8,6 +8,10 @@ import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.UpdateResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.json.JsonData;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Clock;
@@ -16,7 +20,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -35,6 +42,11 @@ import org.springframework.stereotype.Service;
 public class QuestionService {
 
     static final int MAX_VARIANTS = 20;
+
+    /** Lock waits longer than this are logged as warnings. */
+    static final long SLOW_LOCK_WAIT_MS = 1000;
+
+    private static final Logger log = LoggerFactory.getLogger(QuestionService.class);
 
     private static final String MERGE_SCRIPT = """
             ctx._source.asks += 1;
@@ -57,7 +69,8 @@ public class QuestionService {
     private final Embedder embedder;
     private final BoardService boards;
     private final Clock clock;
-    private final Map<String, Object> boardLocks = new ConcurrentHashMap<>();
+    private final Map<String, ReentrantLock> boardLocks = new ConcurrentHashMap<>();
+    private final QuestionTelemetry telemetry = new QuestionTelemetry(boardLocks);
 
     public QuestionService(ElasticsearchClient client, QuestionProperties properties, Embedder embedder,
                            BoardService boards, Clock clock) {
@@ -81,34 +94,72 @@ public class QuestionService {
      * cannot each miss the other and create duplicate groups.
      */
     public SubmitResult submit(String board, String text) {
-        return withBoardLock(board, () -> doSubmit(board, text));
+        Span span = telemetry.tracer.spanBuilder("askonce.submit").setAttribute(QuestionTelemetry.BOARD, board).startSpan();
+        try (Scope ignored = span.makeCurrent()) {
+            SubmitResult result = withBoardLock(board, () -> doSubmit(board, text));
+            String outcome = result.merged() ? "merged" : "new";
+            span.setAttribute(QuestionTelemetry.MERGED, result.merged());
+            telemetry.submitted.add(1, Attributes.of(QuestionTelemetry.BOARD, board, QuestionTelemetry.RESULT, outcome));
+            if (result.similarity() != null) {
+                span.setAttribute(QuestionTelemetry.SIMILARITY, result.similarity());
+                telemetry.similarity.record(result.similarity(), Attributes.of(QuestionTelemetry.BOARD, board));
+            }
+            return result;
+        } catch (RuntimeException e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR);
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     <T> T withBoardLock(String board, Supplier<T> action) {
-        synchronized (boardLocks.computeIfAbsent(board, key -> new Object())) {
+        ReentrantLock lock = boardLocks.computeIfAbsent(board, key -> new ReentrantLock());
+        Span waitSpan = telemetry.tracer.spanBuilder("askonce.board_lock.wait")
+                .setAttribute(QuestionTelemetry.BOARD, board)
+                .setAttribute(QuestionTelemetry.LOCK_QUEUE, (long) lock.getQueueLength())
+                .startSpan();
+        long start = System.nanoTime();
+        lock.lock();
+        long waitedMs = (System.nanoTime() - start) / 1_000_000;
+        waitSpan.setAttribute(QuestionTelemetry.LOCK_WAIT_MS, waitedMs);
+        waitSpan.end();
+        telemetry.lockWait.record(waitedMs, Attributes.of(QuestionTelemetry.BOARD, board));
+        if (waitedMs > SLOW_LOCK_WAIT_MS) {
+            log.warn("Slow submission on board '{}': waited {} ms for the board lock, {} more still queued",
+                    board, waitedMs, lock.getQueueLength());
+        }
+        try {
             return action.get();
+        } finally {
+            lock.unlock();
         }
     }
 
     private SubmitResult doSubmit(String board, String text) {
         String question = text.strip();
-        Map<String, Float> tokens = embedder.embed(question);
-        Match best = bestMatch(candidates(board, question), tokens, boards.topicWeights(board));
+        Map<String, Float> tokens = telemetry.inSpan("askonce.embed", () -> embedder.embed(question));
+        List<QuestionGroup> candidates = telemetry.inSpan("askonce.find_candidates", () -> candidates(board, question));
+        Span.current().setAttribute(QuestionTelemetry.CANDIDATES, (long) candidates.size());
+        Match best = bestMatch(candidates, tokens, boards.topicWeights(board));
 
         if (best != null && shouldMerge(best.similarity(), properties.mergeThreshold())) {
-            QuestionGroup merged = update(best.id(), MERGE_SCRIPT, Map.of(
+            QuestionGroup merged = telemetry.inSpan("askonce.merge", () -> update(best.id(), MERGE_SCRIPT, Map.of(
                     "text", JsonData.of(question),
                     "tokens", JsonData.of(tokens),
-                    "maxVariants", JsonData.of(MAX_VARIANTS)));
+                    "maxVariants", JsonData.of(MAX_VARIANTS))));
             return new SubmitResult(QuestionView.of(merged), true, best.similarity());
         }
 
         QuestionGroup group = QuestionGroup.create(UUID.randomUUID().toString(), board, question, tokens, clock.millis());
-        try {
-            client.index(i -> i.index(properties.index()).id(group.id()).document(group).refresh(Refresh.WaitFor));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        telemetry.inSpan("askonce.create_group", () -> {
+            try {
+                return client.index(i -> i.index(properties.index()).id(group.id()).document(group).refresh(Refresh.WaitFor));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
         return new SubmitResult(QuestionView.of(group), false, best == null ? null : best.similarity());
     }
 

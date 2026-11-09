@@ -1,8 +1,12 @@
 # AskOnce on Kubernetes (tested on kind with Elasticsearch running on the host via start-local).
 #
-# The Elasticsearch password is NOT stored here. Create the Secret first:
+# Credentials are NOT stored here. Create the Secrets first:
 #   set -a; source ~/elastic-start-local/.env; set +a
 #   kubectl -n askonce create secret generic es-credentials --from-literal=password="$ES_LOCAL_PASSWORD"
+#   read -rs DASH0_TOKEN   # paste the Dash0 auth token, then press Enter
+#   kubectl -n askonce create secret generic dash0-otlp \
+#     --from-literal=endpoint=<Dash0 "OTLP via HTTP" endpoint> \
+#     --from-literal=headers="Authorization=Bearer $DASH0_TOKEN"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -27,7 +31,7 @@ spec:
     spec:
       containers:
         - name: askonce
-          image: askonce:0.1.0
+          image: askonce:0.2.0
           imagePullPolicy: IfNotPresent # image is loaded into kind with `kind load docker-image`
           ports:
             - name: http
@@ -40,6 +44,33 @@ spec:
                 secretKeyRef:
                   name: es-credentials
                   key: password
+            # OpenTelemetry -> Dash0
+            - name: OTEL_SERVICE_NAME
+              value: askonce
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: http/protobuf
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: dash0-otlp
+                  key: endpoint
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: dash0-otlp
+                  key: headers
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: "10000"
+            - name: K8S_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.namespace=askonce,deployment.environment.name=hackathon,k8s.cluster.name=cnh,k8s.namespace.name=askonce,k8s.deployment.name=askonce,k8s.pod.name=$(K8S_POD_NAME),k8s.node.name=$(K8S_NODE_NAME)
           resources:
             requests:
               cpu: 250m
