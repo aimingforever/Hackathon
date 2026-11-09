@@ -71,6 +71,10 @@ spec:
                   key: headers
             - name: OTEL_METRIC_EXPORT_INTERVAL
               value: "10000"
+            # Name the Elasticsearch dependency so traces and the service map show "elasticsearch"
+            # (with its share of request time) instead of a bare host name.
+            - name: OTEL_INSTRUMENTATION_COMMON_PEER_SERVICE_MAPPING
+              value: host.docker.internal=elasticsearch,host.docker.internal:9200=elasticsearch
             - name: K8S_POD_NAME
               valueFrom:
                 fieldRef:
